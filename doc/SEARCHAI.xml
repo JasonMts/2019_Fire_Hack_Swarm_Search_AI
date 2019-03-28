@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE MDM SYSTEM 'MDM.DTD'>
+
+<!--
+        <h2>Introduction</h2>
+        
+        <p>
+        This message set provides capabilities beyond the standard CMASI message set.  It is based on CMASI version 3.
+        </p>
+
+
+        <h2>Changes</h2>
+			<h3>14 Jan 2019</h3>
+			<ul>
+				<li>Removed Estimated Zone Radius from {@link HazardZoneEstimateReport}</li>
+			</ul>
+			<h3> 9 Jan 2019</h3>
+			<ul> 
+			    <li>Added {@link HazardSensorConfiguration</li>
+			</ul>
+            <h3>13 Dec 2018</h3>
+            <ul>
+                <li>Added {@link HazardZoneReport} and {@link LaunchRecoveryPoint}</li>
+            </ul>
+            <h3>6 Dec 2018</h3>
+            <ul>
+                <li>Initial Version.  Introducing Hazard Zones and Fire Sensor</li>
+            </ul>
+            
+-->
+
+<MDM>
+    <SeriesName>SEARCHAI</SeriesName>
+    <Namespace>afrl/cmasi/searchai</Namespace>
+    <Version>5</Version>
+
+    <EnumList>
+        <!-- Type of Hazard  -->
+        <Enum Name="HazardType">
+            <!-- Not defined -->
+            <Entry Name="Undefined" Value="0"/>
+            <!-- fire hazard -->
+            <Entry Name="Fire" Value="1"/>
+            <!-- smoke hazard -->
+            <Entry Name="Smoke" Value="2"/>
+        </Enum>
+
+    </EnumList>
+
+    <StructList>
+
+        <!-- Representation of a hazard in the scenario.  This defines a 3D zone based on 
+             a 2D geometry and min/max altitude. See {@link CMASI/AbstractZone} for 
+             details regarding CMASI zone definition.
+        -->
+        <Struct Name="HazardZone" Extends="CMASI/AbstractZone">
+            <Field Name="ZoneType" Type="HazardType"  Default="Undefined"/>
+        </Struct>
+        
+        <!-- Issued by an aircaft that detects a hazard zone with a sensor -->
+        <Struct Name="HazardZoneDetection">
+            <!-- Approximate location of detected Zone.  Zero altitude denotes ground level -->
+            <Field Name="DetectedLocation" Type="CMASI/Location3D"/>
+            
+            <!-- Sensor payload ID of sensor performing the detection -->
+            <Field Name="SensorPayloadID" Type="uint32"/>
+            
+            <!-- ID of the entity (aircraft) that is making the detection -->
+            <Field Name="DetectingEnitiyID" Type="uint32"/>
+			
+			<!-- Type of the hazard zone detected -->
+            <Field Name="DetectedHazardZoneType" Type="HazardType"/>
+        </Struct>
+        
+        <!-- Issued by an zone detection service that is computing the perceived location and vector of a
+             hazard.  
+        -->
+        <Struct Name="HazardZoneEstimateReport">
+            
+            <!-- A unique ID used by the service providing the estimate.  This is used to differentiate
+                 perceptions if there are multiple concurrent zones in the scenario.
+            -->
+            <Field Name="UniqueTrackingID" Type="uint32"/>
+            
+            <!-- Estimated shape of the zone.  Can be null.  If null, then the service is reporting 
+                 that is is not estimating the shape of the zone.
+            -->
+            <Field Name="EstimatedZoneShape" Type="CMASI/AbstractGeometry"/>
+                        
+            <!-- Estimated rate of change in the average radius of the zone.  Can be negative. -->
+            <Field Name="EstimatedGrowthRate" Type="real32" Units="m/s"/>
+            
+            <!-- Type of perceived zone being reported -->
+            <Field Name="PerceivedZoneType" Type="HazardType"/>
+            
+            <!-- Estimated true compass direction of movement of the hazard zone. -->
+            <Field Name="EstimatedZoneDirection" Type="real32" Units="Degree"/>
+            
+            <!-- Estimated speed of the hazard zone.  This is the speed of the centerpoint of the shape. -->
+            <Field Name="EstimatedZoneSpeed" Type="real32" Units="m/s"/>
+            
+        </Struct>
+        
+        <!-- A named location for recovering UAVs  -->
+        <Struct Name="RecoveryPoint" Extends="CMASI/AbstractZone">
+            <!-- Name of Location -->
+            <Field Name="LocationName" Type="string" />
+        </Struct>
+        
+        <!-- Controls the growth/contraction of a zone and translation across the 
+             scenario area.
+        -->
+        <Struct Name="HazardZoneChangeCommand">
+            <!-- ID of zone to control.  If zero, then this is treated as a default 
+                 command for all zones not governed by a zone-specific message. 
+            -->
+            <Field Name="ZoneID" Type="uint32"/>
+            
+            <!-- The rate of growth of the zone.  How this affects the zone depends on its 
+                 geometry type.  
+            -->
+            <Field Name="GrowthRate" Type="real32" Units="m/s"/>
+            
+            <!-- Translation rate of the zone across the scenario area. -->
+            <Field Name="TranslationRate" Type="real32" Units="m/s"/>
+            
+            <!-- True direction of translation of the zone.  -->
+            <Field Name="TranslationDirection" Type="real32" Units="degrees"/>
+        </Struct>
+		
+		<!-- A sensor that can detect hazards.  Field of view is fixed, but can be mounted on a gimbal.  -->
+		<Struct Name="HazardSensorConfiguration" Extends="CMASI/PayloadConfiguration"> 
+			<!-- Max range that a hazard can be detected -->
+			<Field Name="MaxRange" Type="real32" Units="m"/>
+			
+			<!-- Horizontal extents of the sensor -->
+			<Field Name="HorizontalFOV" Type="real32" Units="degrees"/>
+			
+			<!-- Vertical extents of the sensor -->
+			<Field Name="VerticalFOV" Type="real32" Units="degrees"/>
+			
+			<!-- Types of hazards that can be detected by this sensor -->
+			<Field Name="DetectableHazardTypes" Type="HazardType[]"/>
+		</Struct>
+		
+		<!-- Current state of a hazard sensor -->
+		<Struct Name="HazardSensorState" Extends="CMASI/CameraState">
+			
+		</Struct>
+		
+		
+    </StructList>
+</MDM>
+
+
+
+
