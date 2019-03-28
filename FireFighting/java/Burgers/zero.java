@@ -1,3 +1,5 @@
+package Burgers;
+
 // ===============================================================================
 // Authors: Jacob Allex-Buckner
 // Organization: University of Dayton Research Institute Applied Sensing Division
