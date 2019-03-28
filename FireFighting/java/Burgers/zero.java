@@ -120,13 +120,13 @@ public class zero extends Thread {
         //Setting 3D coordinates
         waypoint1.setLatitude(wayPointList.get(wayPointListCount));
         waypoint1.setLongitude(wayPointList.get(wayPointListCount + 1));
-        waypoint1.setAltitude(20);
+        waypoint1.setAltitude(100);
         waypoint1.setAltitudeType(AltitudeType.MSL);
         //Setting unique ID for the waypoint
         waypoint1.setNumber(1);
 
         //Setting speed to reach the waypoint
-        waypoint1.setSpeed(30);
+        waypoint1.setSpeed(20);
         waypoint1.setSpeedType(SpeedType.Airspeed);
         //Setting the climb rate to reach new altitude (if applicable)
         waypoint1.setClimbRate(0);
@@ -188,7 +188,7 @@ public class zero extends Thread {
         loiterAction.setLength(0);
         loiterAction.setDirection(LoiterDirection.Clockwise);
         loiterAction.setDuration(100000);
-        loiterAction.setAirspeed(15);
+        loiterAction.setAirspeed(20);
 
         //Creating a 3D location object for the stare point
         loiterAction.setLocation(location);
