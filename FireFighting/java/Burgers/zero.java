@@ -8,7 +8,6 @@ package Burgers;
 // the Secretary of the Air Force.  No copyright is claimed in the United States under
 // Title 17, U.S. Code.  All Other Rights Reserved.
 // ===============================================================================
-
 // This file was auto-created by LmcpGen. Modifications will be overwritten.
 import afrl.cmasi.AirVehicleState;
 import afrl.cmasi.searchai.HazardZoneDetection;
@@ -61,13 +60,13 @@ public class zero extends Thread {
      */
     boolean[] uavsLoiter = new boolean[4];
     Polygon estimatedHazardZone = new Polygon();
-
+  
     public int wayPointNumber = 1;
     public int missionCount = 1;
     List<Double> wayPointList = new ArrayList<>();
     List<Integer> loiterCommand = new ArrayList<>();
     int wayPointListCount = 0;
-    
+
     int LoiterCommandID = 1;
 
     public zero() {
@@ -76,6 +75,7 @@ public class zero extends Thread {
     @Override
     public void run() {
         try {
+          
             // connect to the server
             Socket socket = connect(host, port);
             boolean missionCommand = false;
@@ -120,7 +120,7 @@ public class zero extends Thread {
         //Setting 3D coordinates
         waypoint1.setLatitude(wayPointList.get(wayPointListCount));
         waypoint1.setLongitude(wayPointList.get(wayPointListCount + 1));
-        waypoint1.setAltitude(100);
+        waypoint1.setAltitude(20);
         waypoint1.setAltitudeType(AltitudeType.MSL);
         //Setting unique ID for the waypoint
         waypoint1.setNumber(1);
@@ -216,7 +216,7 @@ public class zero extends Thread {
         o.setPerceivedZoneType(afrl.cmasi.searchai.HazardType.Fire);
         o.setEstimatedZoneDirection(0);
         o.setEstimatedZoneSpeed(0);
-
+        System.out.println(estimatedShape.toString());
         //Sending the Vehicle Action Command message to AMASE to be interpreted
         out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
     }
@@ -268,33 +268,43 @@ public class zero extends Thread {
             //System.out.println("UAV: " + uav.getID());
             Location3D loc = uav.getLocation();
             //System.out.println("Lat: " + loc.getLatitude());
-            if (wayPointList.size() == 6) {
+            if (wayPointList.size() >= 6) {
                 if (uav.getID() == 2) {
                     double latError = Math.abs((loc.getLatitude() - wayPointList.get(0)));
                     double lonError = Math.abs((loc.getLongitude() - wayPointList.get(1)));
-                    if (latError < 0.0001 && lonError < 0.0001 ) {
-                        
-                        if(loiterCommand.get(1) == 0){
+                    if (latError < 0.0001 && lonError < 0.0001) {
+
+                        if (loiterCommand.get(1) == 0) {
                             System.out.println("YEAH I AM THERE UAV 2");
-                            Location3D loitLoc = new Location3D(wayPointList.get(0),wayPointList.get(1),100,afrl.cmasi.AltitudeType.MSL);
+                            Location3D loitLoc = new Location3D(wayPointList.get(0), wayPointList.get(1), 100, afrl.cmasi.AltitudeType.MSL);
                             this.sendLoiterCommand(out, 2, loitLoc);
+                            this.estimatedHazardZone.getBoundaryPoints().add(loitLoc);
+                            
+                            //loitLoc = new Location3D(wayPointList.get(4), wayPointList.get(5), 100, afrl.cmasi.AltitudeType.MSL);
+                            
+                            //this.estimatedHazardZone.getBoundaryPoints().add(loitLoc);
+                            
+                            
+                            //Send out the estimation report to draw the polygon
+                            sendEstimateReport(out, estimatedHazardZone);
                             loiterCommand.set(1, 1);
-                         }
+                        }
 
                     }
                 } else if (uav.getID() == 1) {
                     double latError = Math.abs((loc.getLatitude() - wayPointList.get(2)));
                     double lonError = Math.abs((loc.getLongitude() - wayPointList.get(3)));
-                      if (latError < 0.0001 && lonError < 0.0001 ) {
-                         if(loiterCommand.get(0) == 0){
-                             System.out.println("YEAH I AM THERE UAV 1");
-                            Location3D loitLoc = new Location3D(wayPointList.get(2),wayPointList.get(3),100,afrl.cmasi.AltitudeType.MSL);
+                    if (latError < 0.0001 && lonError < 0.0001) {
+                        if (loiterCommand.get(0) == 0) {
+                            System.out.println("YEAH I AM THERE UAV 1");
+                            Location3D loitLoc = new Location3D(wayPointList.get(2), wayPointList.get(3), 100, afrl.cmasi.AltitudeType.MSL);
                             this.sendLoiterCommand(out, 1, loitLoc);
+                            this.estimatedHazardZone.getBoundaryPoints().add(loitLoc);
+                            //Send out the estimation report to draw the polygon
+                            sendEstimateReport(out, estimatedHazardZone);
                             loiterCommand.set(0, 1);
-         
-                         }
-                          
-                        
+
+                        }
 
                     }
                 }
