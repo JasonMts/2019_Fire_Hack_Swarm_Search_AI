@@ -60,14 +60,21 @@ public class zero extends Thread {
      */
     boolean[] uavsLoiter = new boolean[4];
     Polygon estimatedHazardZone = new Polygon();
-  
+
     public int wayPointNumber = 1;
     public int missionCount = 1;
+
+    public int numOfPoints = 0;
     List<Double> wayPointList = new ArrayList<>();
     List<Integer> loiterCommand = new ArrayList<>();
     int wayPointListCount = 0;
 
     int LoiterCommandID = 1;
+
+    double lastLat_1 = 0;
+    double lastLon_1 = 0;
+    double lastLat_2 = 0;
+    double lastLon_2 = 0;
 
     public zero() {
     }
@@ -75,7 +82,7 @@ public class zero extends Thread {
     @Override
     public void run() {
         try {
-          
+
             // connect to the server
             Socket socket = connect(host, port);
             boolean missionCommand = false;
@@ -128,7 +135,8 @@ public class zero extends Thread {
         //Setting speed to reach the waypoint
         waypoint1.setSpeed(20);
         waypoint1.setSpeedType(SpeedType.Airspeed);
-        //Setting the climb rate to reach new altitude (if applicable)
+         
+       //Setting the climb rate to reach new altitude (if applicable)
         waypoint1.setClimbRate(0);
         waypoint1.setTurnType(TurnType.TurnShort);
         //Setting backup waypoints if new waypoint can't be reached
@@ -156,7 +164,7 @@ public class zero extends Thread {
         //Adding the waypoints to the waypoint list
         waypoints.add(waypoint1);
         // waypoints.add(waypoint2);
-
+       
         //Setting the waypoint list in the mission command
         o.getWaypointList().addAll(waypoints);
 
@@ -238,9 +246,35 @@ public class zero extends Thread {
 
             wayPointList.add(detectedLocation.getLatitude());
             wayPointList.add(detectedLocation.getLongitude());
+            int detectingEntity = (int) hazardDetected.getDetectingEnitiyID();
+            if (numOfPoints < 64) {
+                if (detectingEntity == 1) {
+                    double latError = Math.abs((lastLat_1) - detectedLocation.getLatitude());
+                    double lonError = Math.abs((lastLon_1) - detectedLocation.getLongitude());
+                    if (latError > 0.001 && lonError > 0.001) {
+                        this.estimatedHazardZone.getBoundaryPoints().add(detectedLocation);
+
+                        sendEstimateReport(out, estimatedHazardZone);
+                        lastLat_1 =  detectedLocation.getLatitude();
+                        lastLon_1 =  detectedLocation.getLongitude();
+                        numOfPoints++;
+                    }
+
+                } else if (detectingEntity == 2) {
+                    double latError = Math.abs((lastLat_2) - detectedLocation.getLatitude());
+                    double lonError = Math.abs((lastLon_2) - detectedLocation.getLongitude());
+                    if (latError > 0.001 && lonError > 0.001) {
+                        this.estimatedHazardZone.getBoundaryPoints().add(detectedLocation);
+
+                        sendEstimateReport(out, estimatedHazardZone);
+                    }
+                    lastLat_2 = (float) detectedLocation.getLatitude();
+                    lastLon_2 = (float) detectedLocation.getLongitude();
+                    numOfPoints++;
+                }
+            }
 
 //            //Get entity that detected the zone
-//            int detectingEntity = (int) hazardDetected.getDetectingEnitiyID();
 //
 //            //Check if hint
 //            if (detectingEntity == 0) {
@@ -266,12 +300,15 @@ public class zero extends Thread {
         } else if (o instanceof afrl.cmasi.AirVehicleState) {
             AirVehicleState uav = ((AirVehicleState) o);
             //System.out.println("UAV: " + uav.getID());
+           
             Location3D loc = uav.getLocation();
             //System.out.println("Lat: " + loc.getLatitude());
             if (wayPointList.size() >= 6) {
                 if (uav.getID() == 2) {
                     double latError = Math.abs((loc.getLatitude() - wayPointList.get(0)));
                     double lonError = Math.abs((loc.getLongitude() - wayPointList.get(1)));
+                    lastLat_2 = wayPointList.get(0);
+                    lastLon_2 = wayPointList.get(1);
                     if (latError < 0.0001 && lonError < 0.0001) {
 
                         if (loiterCommand.get(1) == 0) {
@@ -279,12 +316,9 @@ public class zero extends Thread {
                             Location3D loitLoc = new Location3D(wayPointList.get(0), wayPointList.get(1), 100, afrl.cmasi.AltitudeType.MSL);
                             this.sendLoiterCommand(out, 2, loitLoc);
                             this.estimatedHazardZone.getBoundaryPoints().add(loitLoc);
-                            
+
                             //loitLoc = new Location3D(wayPointList.get(4), wayPointList.get(5), 100, afrl.cmasi.AltitudeType.MSL);
-                            
                             //this.estimatedHazardZone.getBoundaryPoints().add(loitLoc);
-                            
-                            
                             //Send out the estimation report to draw the polygon
                             sendEstimateReport(out, estimatedHazardZone);
                             loiterCommand.set(1, 1);
@@ -294,6 +328,8 @@ public class zero extends Thread {
                 } else if (uav.getID() == 1) {
                     double latError = Math.abs((loc.getLatitude() - wayPointList.get(2)));
                     double lonError = Math.abs((loc.getLongitude() - wayPointList.get(3)));
+                    lastLat_1 = wayPointList.get(2);
+                    lastLon_1 = wayPointList.get(3);
                     if (latError < 0.0001 && lonError < 0.0001) {
                         if (loiterCommand.get(0) == 0) {
                             System.out.println("YEAH I AM THERE UAV 1");
