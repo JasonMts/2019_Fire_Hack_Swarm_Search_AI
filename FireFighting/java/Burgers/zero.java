@@ -69,6 +69,8 @@ public class zero extends Thread {
     /**
      * Array of booleans indicating if loiter command has been sent to each UAV
      */
+        //this is to check if a uav is currently going home
+    private boolean returningHome = false;
     boolean[] uavsLoiter = new boolean[4];
     Polygon estimatedHazardZoneUAV1 = new Polygon();
     Polygon estimatedHazardZoneUAV2 = new Polygon();
@@ -567,7 +569,15 @@ public class zero extends Thread {
             AirVehicleState uav = ((AirVehicleState) o);
             //System.out.println("UAV: " + uav.getID());
 
-            //Location3D loc = uav.getLocation();
+            boolean batterylow = isBatteryLow(uav);
+
+            System.out.println("Batter: " + batterylow + " return: " + returningHome);
+            //System.out.println("Batter: " + batterylow + " return: " + returningHome);
+            if (batterylow && (returningHome == false)) {
+                returningHome = true;
+                System.out.println("BATTERY LOWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW! GOING HOME FAM");
+                missionRecharge(out, uav.getID(), refuelLoc);
+            }
             if (scenarioTime > 10) {
                 turnAwayFromFire(out, uav);
             }
@@ -809,6 +819,72 @@ public class zero extends Thread {
             //System.out.printf("i: %d x[i] = %f, y[i] = %f theta: %f\n",i,x[i],y[i],theta[i]);
         }
     }
+
+    private void missionRecharge(OutputStream out, long id, Location3D refuelLoc) throws Exception {
+
+        //We will now have 4 missions
+        ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
+
+        //one for each drone
+        MissionCommand o = new MissionCommand();
+
+        o.setFirstWaypoint(1);
+        //Setting the UAV to recieve the mission
+        o.setVehicleID(id);
+        o.setStatus(CommandStatusType.Pending);
+        //Setting a unique mission command ID
+        o.setCommandID(missionCount);
+        missionCount++;
+
+        //Creating the list of waypoints to be sent with the mission command
+        ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
+
+        Waypoint waypointDev = new Waypoint();
+
+        waypointDev.setLatitude(refuelLoc.getLatitude());
+        waypointDev.setLongitude(refuelLoc.getLongitude());
+        waypointDev.setAltitude(700);
+
+        waypointDev.setAltitudeType(AltitudeType.MSL);
+        //Setting unique ID for the waypoint
+        waypointDev.setNumber(1);
+
+        //Setting speed to reach the waypoint
+        waypointDev.setSpeed(100);
+        waypointDev.setSpeedType(SpeedType.Airspeed);
+
+        //Setting the climb rate to reach new altitude (if applicable)
+        waypointDev.setClimbRate(100);
+        waypointDev.setTurnType(TurnType.TurnShort);
+        //Setting backup waypoints if new waypoint can't be reached
+        waypointDev.setContingencyWaypointA(0);
+        waypointDev.setContingencyWaypointB(0);
+
+        // waypointDev.setNextWaypoint(i + 1);
+        waypoints.add(waypointDev);
+
+        //Setting the waypoint list in the mission command
+        o.getWaypointList().addAll(waypoints);
+
+        //Sending the Mission Command message to AMASE to be interpreted
+        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
+        wayPointNumber++;
+        wayPointListCount += 2;
+
+    }
+    //check if the battery of the uav is low
+    public boolean isBatteryLow(AirVehicleState uav) {
+        
+       double batteryPercentage = uav.getEnergyAvailable();
+       
+       if(batteryPercentage < 30)
+       {
+           //System.out.print(batteryPercentage);
+           return true;
+       }
+       return false;
+    }
+ 
 
     public static void main(String[] args) {
         new zero().start();
