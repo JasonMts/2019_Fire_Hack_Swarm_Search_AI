@@ -53,6 +53,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
+import afrl.cmasi.FollowPathCommand;
+
 
 /**
  * Connects to the simulation and sends a fake mission command to every UAV that
@@ -106,7 +108,7 @@ public class zero extends Thread {
     private static HazardZoneDetection latestHazard;
 
     private static long scenarioTime;
-    private static long elapsedTImeUAV3 = 0;
+    private static long last_time = 0;
     private static long elapsedTImeUAV2 = 0;
     private static int countMissedPoints2 = 0;
     private static int countMissedPoints3 = 0;
@@ -125,6 +127,7 @@ public class zero extends Thread {
     private static Location3D lastFire = null;
 
     private static KeepInZone zone = null;
+    private float windSpeed_, windDirection_;
 
     int noThetas = 100;
     double xUAV1[] = new double[noThetas];
@@ -137,6 +140,8 @@ public class zero extends Thread {
     double yUAV4[] = new double[noThetas];
     double xUAV5[] = new double[noThetas];
     double yUAV5[] = new double[noThetas];
+    
+    private int countSpiral = 0;
 
     //vehicle type 0 = fixedWing
     //        type 1 = multi
@@ -182,7 +187,7 @@ public class zero extends Thread {
                         spiralMaker(tempLat, tempLon, xUAV1, yUAV1, noThetas);
 
                         tempLat = rec.getCenterPoint().getLatitude();
-                        tempLon = rec.getCenterPoint().getLongitude() ;
+                        tempLon = rec.getCenterPoint().getLongitude();
                         spiralMaker(tempLat, tempLon, xUAV2, yUAV2, noThetas);
 
                         tempLat = rec.getCenterPoint().getLatitude() - (rec.getHeight() / 110574) / 4;
@@ -196,15 +201,34 @@ public class zero extends Thread {
                         tempLat = rec.getCenterPoint().getLatitude() - (rec.getHeight() / 110574) / 4;
                         tempLon = rec.getCenterPoint().getLongitude() - (rec.getWidth() / 111320 * Math.cos(tempLat * (Math.PI / 180))) / 2;
                         spiralMaker(tempLat, tempLon, xUAV5, yUAV5, noThetas);
-                        sendMissionCommand(socket.getOutputStream(), 1);
-                        sendMissionCommand(socket.getOutputStream(), 2);
-                        sendMissionCommand(socket.getOutputStream(), 3);
-                        sendMissionCommand(socket.getOutputStream(), 4);
-                        sendMissionCommand(socket.getOutputStream(), 5);
-                        missionCommand = true;
+                        if(countSpiral <5){
+                            for (UAV uav : UAVS) {
+                                if ((uav.isFixedWing() || countSpiral ==3) && !uav.isMission()) {
+                                    sendMissionCommand(socket.getOutputStream(), uav.getId());
+                                    uav.setMission(true);
+                                }
+                            }
+                        }else{
+                             missionCommand = true;
+                        }
                     }
                     //sendMissionCommand(out,2,detectedLocation);
                 }
+                if((scenarioTime - last_time > 100000 ) && (scenarioTime > 10000)){
+                    last_time = scenarioTime;
+                    for (UAV uav : UAVS) {
+                        if (!uav.isFixedWing() && uav.isAvailable() && !uav.isMission() && uav.patrol == false ){
+                              followFixedUavCmd(socket.getOutputStream(), uav.getId());
+                              //uav.setMission(true);
+                          }
+                        if (uav.patrol == true){
+                            sendMissionCommandWaypoints(socket.getOutputStream(), uav.getId(), uav.waypointList);
+
+                        }
+                    }
+               
+                }
+                
             }
 
         } catch (Exception ex) {
@@ -221,6 +245,10 @@ public class zero extends Thread {
         //one for each drone
         MissionCommand o = new MissionCommand();
 
+        //VehicleActionCommand repeat = new VehicleActionCommand();
+        //repeat.
+        //o.
+        
         o.setFirstWaypoint(1);
         //Setting the UAV to recieve the mission
         o.setVehicleID(id);
@@ -236,32 +264,32 @@ public class zero extends Thread {
         for (int i = 1; i < waypointnum; i++) {
             Waypoint waypointDev = new Waypoint();
 
-            if (id == 1) {
+            if (countSpiral == 0) {
 
                 waypointDev.setLatitude(xUAV1[i]);
                 waypointDev.setLongitude(yUAV1[i]);
                 waypointDev.setAltitude(1000);
 
             }
-            if (id == 2) {
+            if (countSpiral == 1) {
 
                 waypointDev.setLatitude(xUAV2[i]);
                 waypointDev.setLongitude(yUAV2[i]);
                 waypointDev.setAltitude(1000);
             }
-            if (id == 3) {
+            if (countSpiral == 2) {
 
                 waypointDev.setLatitude(xUAV3[i]);
                 waypointDev.setLongitude(yUAV3[i]);
                 waypointDev.setAltitude(1000);
             }
-            if (id == 4) {
+            if (countSpiral == 3) {
 
                 waypointDev.setLatitude(xUAV4[i]);
                 waypointDev.setLongitude(yUAV4[i]);
                 waypointDev.setAltitude(1000);
             }
-            if (id == 5) {
+            if (countSpiral == 4) {
 
                 waypointDev.setLatitude(xUAV5[i]);
                 waypointDev.setLongitude(yUAV5[i]);
@@ -303,8 +331,121 @@ public class zero extends Thread {
         out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
         wayPointNumber++;
         wayPointListCount += 2;
+        countSpiral++;
+    }
+    
+    public void sendMissionCommandWaypoints(OutputStream out, int id, ArrayList<Waypoint> waypoints ) throws Exception {
+        //Setting up the mission to send to the UAV
+
+        //We will now have 4 missions
+        ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
+
+        //one for each drone
+        MissionCommand o = new MissionCommand();
+
+        //VehicleActionCommand repeat = new VehicleActionCommand();
+        //repeat.
+        //o.
+        
+        o.setFirstWaypoint(1);
+        //Setting the UAV to recieve the mission
+        o.setVehicleID(id);
+        o.setStatus(CommandStatusType.Pending);
+        //Setting a unique mission command ID
+        o.setCommandID(missionCount);
+        missionCount++;
+
+        //Setting the waypoint list in the mission command
+        o.getWaypointList().addAll(waypoints);
+
+        //Sending the Mission Command message to AMASE to be interpreted
+        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
+        wayPointNumber++;
+        wayPointListCount += 2;
+        countSpiral++;
     }
 
+    public void followFixedUavCmd(OutputStream out, int id) throws Exception {
+        //Setting up the mission to send to the UAV
+
+        //We will now have 4 missions
+        //ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
+
+        //one for each drone
+        MissionCommand o = new MissionCommand();
+        
+        o.setFirstWaypoint(1);
+        //Setting the UAV to recieve the mission
+        o.setVehicleID(id);
+        o.setStatus(CommandStatusType.Pending);
+        //Setting a unique mission command ID
+        o.setCommandID(missionCount);
+        missionCount++;
+
+        //Creating the list of waypoints to be sent with the mission command
+        ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
+
+        int waypointnum = noThetas;
+        
+        Waypoint waypointDev = new Waypoint();
+
+        waypointDev.setAltitude(700);
+        waypointDev.setAltitudeType(AltitudeType.MSL);
+        //Setting unique ID for the waypoint
+        waypointDev.setNumber(1);
+
+        // get current UAV
+        //UAV currUAV = UAVS.get(id-1);
+        
+        for (int i=0; i < UAVS.size();i++){
+            
+            if (UAVS.get(i).isFixedWing() ){
+                
+                if (!UAVS.get(i).isGotFollower()) {
+                    waypointDev.setLatitude(UAVS.get(i).getLastAirstate().getLocation().getLatitude());
+                    waypointDev.setLongitude(UAVS.get(i).getLastAirstate().getLocation().getLongitude());
+                    waypointDev.setAltitude(1000);
+                
+                    UAVS.get(i).setFollower(i);
+                    UAVS.get(i).setGotFollower(true);
+                    System.out.printf("fhfhf");
+                    break;
+                }
+                else if ( i == UAVS.get(i).getFollower(i) ){
+                    waypointDev.setLatitude(UAVS.get(i).getLastAirstate().getLocation().getLatitude());
+                    waypointDev.setLongitude(UAVS.get(i).getLastAirstate().getLocation().getLongitude());
+                    waypointDev.setAltitude(1000);
+                    System.out.printf("FOLLOW ALREADY");
+                    break;
+                }
+            } 
+        }
+        
+        //Setting speed to reach the waypoint
+        waypointDev.setSpeed(100);
+        waypointDev.setSpeedType(SpeedType.Airspeed);
+
+        //Setting the climb rate to reach new altitude (if applicable)
+        waypointDev.setClimbRate(100);
+        waypointDev.setTurnType(TurnType.TurnShort);
+        //Setting backup waypoints if new waypoint can't be reached
+        waypointDev.setContingencyWaypointA(0);
+        waypointDev.setContingencyWaypointB(0);
+
+        waypoints.add(waypointDev);
+        
+
+        //Setting the waypoint list in the mission command
+        o.getWaypointList().addAll(waypoints);
+
+        //Sending the Mission Command message to AMASE to be interpreted
+        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
+        //wayPointNumber++;
+        //wayPointListCount += 2;
+        //countSpiral++;
+}
+    
+    
     public void goToFire(OutputStream out, int id, Location3D loc) throws Exception {
         //Setting up the mission to send to the UAV
 
@@ -471,6 +612,7 @@ public class zero extends Thread {
         //System.out.println(estimatedShape.toString());
         //Sending the Vehicle Action Command message to AMASE to be interpreted
         out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
+
     }
 
     /**
@@ -500,14 +642,17 @@ public class zero extends Thread {
 
             if (curUAV.isFixedWing()) {
                 callForFireMapping(out, curUAV, detectedLocation);
-            } else if (curUAV.isMulti()) {
+            } else if (curUAV.isMulti()  && !curUAV.patrol) {
                 circleFire(out, curUAV, detectedLocation);
             }
 
 //           
         } else if (o instanceof afrl.cmasi.AirVehicleState) {
+            
             AirVehicleState uav = ((AirVehicleState) o);
             //System.out.println("UAV: " + uav.getID());
+            windSpeed_ = uav.getWindSpeed();
+            windDirection_ = uav.getWindDirection();
 
             boolean batterylow = isBatteryLow(uav);
 
@@ -518,7 +663,7 @@ public class zero extends Thread {
                 System.out.println("BATTERY LOWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW! GOING HOME FAM");
                 missionRecharge(out, uav.getID(), refuelLoc);
             }
-            if (scenarioTime > 10) {
+            if (scenarioTime > 10 && !UAVS.get((int)uav.getID()-1).patrol) {
                 turnAwayFromFire(out, uav);
             }
 
@@ -593,9 +738,10 @@ public class zero extends Thread {
         }
         if (goInside) {
             for (UAV uav : UAVS) {
-                if (uav.isAvailable()) {
+                if (uav.isAvailable() && !uav.isMission()) {
                     goToFire(out, uav.getId(), detectedLocation);
                     uav.setAvailable(false);
+                    break;
 
                 }
             }
@@ -638,6 +784,17 @@ public class zero extends Thread {
                 if (distance < 0.01 && curUAV.getCurrSizePolygon() > 5) {
                     curUAV.setCircleFire(true);
                     curUAV.setCircleCounter(0);
+
+                    //ArrayList<Waypoint> waypointList = new ArrayList<Waypoint>();
+                    getHotSpotPoints(curUAV.getEstimateHazardZone(), curUAV.waypointList);
+                    
+                    curUAV.patrol = true;
+                    sendMissionCommandWaypoints(out, curUAV.getId(),curUAV.waypointList);
+                    //sendMissionCommandWaypoints(out, curUAV.getId(),waypointList);
+                    //sendMissionCommandWaypoints(out, curUAV.getId(),waypointList);
+                    //sendMissionCommandWaypoints(out, curUAV.getId(),waypointList);
+                    //sendMissionCommandWaypoints(out, curUAV.getId(),waypointList);
+
                 }
 
                 if (curUAV.getCircleCounter() >= curUAV.getCurrSizePolygon() && curUAV.getCircleCounter() != 0) {
@@ -746,7 +903,7 @@ public class zero extends Thread {
         double b = 0.0018;
         double a = 0.019;
 
-        double inc = 720 / noThetas;
+        double inc = 1080 / noThetas;
         for (int i = 0; i < noThetas; i++) {
             theta[i] = 0;
         }
@@ -756,8 +913,8 @@ public class zero extends Thread {
 
         for (int i = 0; i < noThetas; i++) {
 
-            x[i] = myLong + a * Math.exp(b * theta[i]) * Math.cos(Math.toRadians(theta[i]));
-            y[i] = myLat + a * Math.exp(b * theta[i]) * Math.sin(Math.toRadians(theta[i]));
+            x[i] = myLong + a * Math.exp(b * theta[i] - 0.5) * Math.sin(Math.toRadians(theta[i]));
+            y[i] = myLat + a * Math.exp(b * theta[i]) * Math.cos(Math.toRadians(theta[i]));
             // print the values
             //System.out.printf("i: %d x[i] = %f, y[i] = %f theta: %f\n",i,x[i],y[i],theta[i]);
         }
@@ -826,6 +983,99 @@ public class zero extends Thread {
             return true;
         }
         return false;
+    }
+
+    public static void getCentroid(Polygon fireZone, float cntr[]) {
+
+        int pPoints = fireZone.getBoundaryPoints().size();
+        float cntX = 0;
+        float cntY = 0;
+
+        for (int i = 0; i < pPoints; i++) {
+            cntX += fireZone.getBoundaryPoints().get(i).getLatitude();
+            cntY += fireZone.getBoundaryPoints().get(i).getLongitude();
+        }
+        cntX = cntX / pPoints;
+        cntY = cntY / pPoints;
+
+        cntr[0] = cntX;
+        cntr[1] = cntY;
+
+        System.out.printf("X: %f Y: %f\n", cntX, cntY);
+    }
+
+    public void getHotSpotPoints(Polygon hazardZone, ArrayList<Waypoint> waypointList) {
+
+        float relativeWindDirection = 0;
+        float minRange, maxRange;
+
+        float x[];
+        float y[];
+
+        if ((windDirection_ > 0) && (windDirection_ < 90)) {
+            relativeWindDirection = 270 - windDirection_;
+        } else if ((windDirection_ > 90) && (windDirection_ < 180)) {
+            relativeWindDirection = 270 - windDirection_;
+        } else if ((windDirection_ > 180) && (windDirection_ < 270)) {
+            relativeWindDirection = 270 - windDirection_;
+        } else if ((windDirection_ > 270) && (windDirection_ < 360)) {
+            relativeWindDirection = 630 - windDirection_;
+        }
+        System.out.printf("WindSpeed:: %f\n", relativeWindDirection);
+
+        // Check the fire polygon
+        float relativeSearchDirection = relativeWindDirection + 180;
+
+        maxRange = relativeSearchDirection + 25;
+        minRange = relativeSearchDirection - 25;
+
+        float cntr[] = new float[2];
+        getCentroid(hazardZone, cntr);
+
+        System.out.printf("range [%f,%f] :\n", maxRange, minRange);
+
+        double xx, yy;
+
+        //
+        for (int i = 0; i < hazardZone.getBoundaryPoints().size(); i++) {
+
+            xx = hazardZone.getBoundaryPoints().get(i).getLatitude() - cntr[0];
+            yy = hazardZone.getBoundaryPoints().get(i).getLongitude() - cntr[1];
+
+            double angl = Math.atan2(yy, xx) * 180 / Math.PI;
+
+            if (angl < 0) {
+                angl = 360 + angl;
+            }
+            //System.out.printf("loc [%f,^%f], angle: [%f] :\n",xx,yy,angl) ; 
+
+            if (((angl) < maxRange) && (angl > minRange)) {
+                System.out.printf("My awesome angle:: %f @ point x,y:: [%f,%f]\n", angl, hazardZone.getBoundaryPoints().get(i).getLatitude(), hazardZone.getBoundaryPoints().get(i).getLongitude());
+                addWaypointToList(hazardZone.getBoundaryPoints().get(i).getLatitude(), hazardZone.getBoundaryPoints().get(i).getLongitude(), waypointList);
+            }
+        }
+    }
+
+    public void addWaypointToList(double x, double y, ArrayList<Waypoint> waypoints) {
+
+        Waypoint waypointDev = new Waypoint();
+
+        waypointDev.setLatitude(x);
+        waypointDev.setLongitude(y);
+        waypointDev.setAltitude(700);
+
+        waypointDev.setAltitudeType(AltitudeType.MSL);
+        waypointDev.setNumber(1);
+        waypointDev.setSpeed(100);
+        waypointDev.setSpeedType(SpeedType.Airspeed);
+
+        waypointDev.setClimbRate(100);
+        waypointDev.setTurnType(TurnType.TurnShort);
+        waypointDev.setContingencyWaypointA(0);
+        waypointDev.setContingencyWaypointB(0);
+
+        // waypointDev.setNextWaypoint(i + 1);
+        waypoints.add(waypointDev);
     }
 
     public static void main(String[] args) {

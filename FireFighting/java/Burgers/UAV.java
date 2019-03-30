@@ -8,8 +8,10 @@ package Burgers;
 import afrl.cmasi.AirVehicleState;
 import afrl.cmasi.Location3D;
 import afrl.cmasi.Polygon;
+import afrl.cmasi.Waypoint;
 import afrl.cmasi.searchai.HazardZone;
 import afrl.cmasi.searchai.HazardZoneDetection;
+import java.util.ArrayList;
 
 /**
  *
@@ -20,6 +22,7 @@ public class UAV {
     
     private int droneType;
     private boolean available;
+    private boolean mission =false;
     private int id;
     
     private double latDiff;
@@ -41,12 +44,21 @@ public class UAV {
     
     private int currSizePolygon = 0;
     private long elapsedTime = 0;
+    private boolean gotFollower = false;
     public UAV(int droneType, boolean available, int id) {
         this.droneType = droneType;
         this.available = available;
         this.id = id;
     }
+    
+    public boolean patrol = false; 
+    private int  follower;
+    public long latEnd;
+    public long lonEnd;
 
+    public ArrayList<Waypoint> waypointList = new ArrayList<Waypoint>();
+
+    
     public int getDroneType() {
         return droneType;
     }
@@ -204,6 +216,48 @@ public class UAV {
 
     public void setElapsedTime(long elapsedTime) {
         this.elapsedTime = elapsedTime;
+    }
+
+    public boolean isMission() {
+        return mission;
+    }
+
+    public void setMission(boolean mission) {
+        this.mission = mission;
+    }
+
+    public boolean isGotFollower() {
+        return gotFollower;
+    }
+
+    public void setGotFollower(boolean gotFollower) {
+        this.gotFollower = gotFollower;
+    }
+    
+    public void setFollower(int i){
+        this.follower = i;
+    }
+    
+    public int getFollower(int i){
+        return this.follower = i;
+    }
+
+    
+    
+    public long getLatEnd() {
+        return latEnd;
+    }
+
+    public void setLatEnd(long latEnd) {
+        this.latEnd = latEnd;
+    }
+
+    public long getLonEnd() {
+        return lonEnd;
+    }
+
+    public void setLonEnd(long lonEnd) {
+        this.lonEnd = lonEnd;
     }
     
 }
