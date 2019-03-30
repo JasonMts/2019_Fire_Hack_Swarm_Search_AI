@@ -731,15 +731,15 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
             boolean batterylow = isBatteryLow(uav);
             
             
-            System.out.println("Batter: " + batterylow + " return: " + returningHome);
+            //System.out.println("Batter: " + batterylow + " return: " + returningHome);
             if(batterylow && (returningHome == false))
             {
                 returningHome = true;
                 System.out.println("BATTERY LOWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW! GOING HOME FAM");
+                missionRecharge(out, uav.getID(), refuelLoc);
             }
             
-            
-            
+  
 
             Location3D loc = uav.getLocation();
             //System.out.println("Lat: " + loc.getLatitude());
@@ -906,6 +906,8 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
        if(batteryPercentage < 90)
        {
            //System.out.print(batteryPercentage);
+           
+           
            return true;
        }
        return false;
@@ -913,6 +915,60 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
 
     public static void main(String[] args) {
         new zero().start();
+    }
+
+    private void missionRecharge(OutputStream out, long id, Location3D refuelLoc) throws Exception
+    {
+        
+        //We will now have 4 missions
+        ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
+
+        //one for each drone
+        MissionCommand o = new MissionCommand();
+
+        o.setFirstWaypoint(1);
+        //Setting the UAV to recieve the mission
+        o.setVehicleID(id);
+        o.setStatus(CommandStatusType.Pending);
+        //Setting a unique mission command ID
+        o.setCommandID(missionCount);
+        missionCount++;
+
+        //Creating the list of waypoints to be sent with the mission command
+        ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
+
+        Waypoint waypointDev = new Waypoint();
+
+        waypointDev.setLatitude(refuelLoc.getLatitude());
+        waypointDev.setLongitude(refuelLoc.getLongitude());
+        waypointDev.setAltitude(700);
+
+        waypointDev.setAltitudeType(AltitudeType.MSL);
+        //Setting unique ID for the waypoint
+        waypointDev.setNumber(1);
+
+        //Setting speed to reach the waypoint
+        waypointDev.setSpeed(100);
+        waypointDev.setSpeedType(SpeedType.Airspeed);
+
+        //Setting the climb rate to reach new altitude (if applicable)
+        waypointDev.setClimbRate(100);
+        waypointDev.setTurnType(TurnType.TurnShort);
+        //Setting backup waypoints if new waypoint can't be reached
+        waypointDev.setContingencyWaypointA(0);
+        waypointDev.setContingencyWaypointB(0);
+
+        // waypointDev.setNextWaypoint(i + 1);
+        waypoints.add(waypointDev);
+
+        //Setting the waypoint list in the mission command
+        o.getWaypointList().addAll(waypoints);
+
+        //Sending the Mission Command message to AMASE to be interpreted
+        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
+        wayPointNumber++;
+        wayPointListCount += 2;
+        
     }
 
 
