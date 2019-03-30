@@ -13,6 +13,7 @@ import afrl.cmasi.AirVehicleState;
 import afrl.cmasi.searchai.HazardZoneDetection;
 import afrl.cmasi.searchai.HazardZoneEstimateReport;
 import afrl.cmasi.AltitudeType;
+import afrl.cmasi.CameraState;
 import afrl.cmasi.CommandStatusType;
 import afrl.cmasi.GimbalStareAction;
 import afrl.cmasi.Location3D;
@@ -28,6 +29,9 @@ import afrl.cmasi.VehicleActionCommand;
 import afrl.cmasi.Waypoint;
 import afrl.cmasi.Polygon;
 import afrl.cmasi.Circle;
+import afrl.cmasi.FlightDirectorAction;
+import afrl.cmasi.GimbalAngleAction;
+import afrl.cmasi.GimbalState;
 import avtas.lmcp.LMCPFactory;
 import avtas.lmcp.LMCPObject;
 import java.io.IOException;
@@ -59,7 +63,8 @@ public class zero extends Thread {
      * Array of booleans indicating if loiter command has been sent to each UAV
      */
     boolean[] uavsLoiter = new boolean[4];
-    Polygon estimatedHazardZone = new Polygon();
+    Polygon estimatedHazardZoneUAV1 = new Polygon();
+    Polygon estimatedHazardZoneUAV2 = new Polygon();
 
     public int wayPointNumber = 1;
     public int missionCount = 1;
@@ -67,6 +72,8 @@ public class zero extends Thread {
     public int numOfPoints = 0;
     List<Double> wayPointList = new ArrayList<>();
     List<Integer> loiterCommand = new ArrayList<>();
+    List<Integer> gimbalCommand = new ArrayList<>();
+    List<Integer> navCommand = new ArrayList<>();
     int wayPointListCount = 0;
 
     int LoiterCommandID = 1;
@@ -75,6 +82,23 @@ public class zero extends Thread {
     double lastLon_1 = 0;
     double lastLat_2 = 0;
     double lastLon_2 = 0;
+
+    float headingDirUAV1 = 0;
+    float headingDirUAV2 = 0;
+    float headingDirUAV3 = 0;
+    float headingDirUAV4 = 0;
+    private static AirVehicleState latestAirStateUAV1;
+    private static AirVehicleState latestAirStateUAV2;
+    private static AirVehicleState latestAirStateUAV3;
+    private static AirVehicleState latestAirStateUAV4;
+    
+    
+    private static HazardZoneDetection latestHazard;
+
+    private static long scenarioTime;
+    private static long elapsedTIme = 0;
+
+    private static int countMissedPoints = 0;
 
     public zero() {
     }
@@ -88,17 +112,25 @@ public class zero extends Thread {
             boolean missionCommand = false;
             loiterCommand.add(0);
             loiterCommand.add(0);
+            loiterCommand.add(0);
+            loiterCommand.add(0);
+            gimbalCommand.add(0);
+            gimbalCommand.add(0);
+            gimbalCommand.add(0);
+            gimbalCommand.add(0);
+            navCommand.add(0);
+            navCommand.add(0);
+            navCommand.add(0);
+            navCommand.add(0);
+
             while (true) {
                 //Continually read the LMCP messages that AMASE is sending out
                 readMessages(socket.getInputStream(), socket.getOutputStream());
                 if (missionCommand == false) {
-                    if (wayPointList.size() == 6) {
-                        //sendMissionCommand(socket.getOutputStream(),1);
-                        sendMissionCommand(socket.getOutputStream(), 2);
-                        sendMissionCommand(socket.getOutputStream(), 1);
 
-                        missionCommand = true;
-                    }
+                    FlightDirectorAction dir = new FlightDirectorAction(20, SpeedType.Groundspeed, 20, 700, AltitudeType.MSL, 0);
+                    sendNavigationCommand(socket.getOutputStream(), 2, dir);
+                    missionCommand = true;
 
                     //sendMissionCommand(out,2,detectedLocation);
                 }
@@ -135,8 +167,8 @@ public class zero extends Thread {
         //Setting speed to reach the waypoint
         waypoint1.setSpeed(20);
         waypoint1.setSpeedType(SpeedType.Airspeed);
-         
-       //Setting the climb rate to reach new altitude (if applicable)
+
+        //Setting the climb rate to reach new altitude (if applicable)
         waypoint1.setClimbRate(0);
         waypoint1.setTurnType(TurnType.TurnShort);
         //Setting backup waypoints if new waypoint can't be reached
@@ -164,7 +196,7 @@ public class zero extends Thread {
         //Adding the waypoints to the waypoint list
         waypoints.add(waypoint1);
         // waypoints.add(waypoint2);
-       
+
         //Setting the waypoint list in the mission command
         o.getWaypointList().addAll(waypoints);
 
@@ -172,6 +204,66 @@ public class zero extends Thread {
         out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
         wayPointNumber++;
         wayPointListCount += 2;
+    }
+
+    public void sendSensorCommand(OutputStream out, int uav) throws Exception {
+        //Setting up the mission to send to the UAV
+        VehicleActionCommand o = new VehicleActionCommand();
+        o.setVehicleID(uav);
+        o.setStatus(CommandStatusType.Pending);
+        o.setCommandID(1);
+
+        //Setting up the vehical action command list
+        ArrayList<VehicleAction> vehicleActionList = new ArrayList<VehicleAction>();
+
+        //Setting up the gimbal stare vehicle action
+//         GimbalStareAction gimbalStareAction = new GimbalStareAction();
+//         gimbalStareAction.setPayloadID(1);
+//         gimbalStareAction.setDuration(1000000);
+//         
+        GimbalAngleAction state = new GimbalAngleAction();
+        state.setPayloadID(1);
+        state.setRotation(0);
+        state.setAzimuth(45);
+        state.setElevation(-45);
+
+        //Creating a 3D location object for the stare point
+        // Location3D location = new Location3D(1.52, -132.51, 0, afrl.cmasi.AltitudeType.MSL);
+        //gimbalStareAction.setStarepoint(location);
+        //Adding the gimbal stare action to the vehicle action list
+        vehicleActionList.add(state);
+
+        o.getVehicleActionList().addAll(vehicleActionList);
+
+        //Sending the Vehicle Action Command message to AMASE to be interpreted
+        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
+    }
+
+    public void sendNavigationCommand(OutputStream out, int uav, FlightDirectorAction flight) throws Exception {
+        //Setting up the mission to send to the UAV
+        VehicleActionCommand o = new VehicleActionCommand();
+        o.setVehicleID(uav);
+        o.setStatus(CommandStatusType.Pending);
+        o.setCommandID(1);
+
+        //Setting up the vehical action command list
+        ArrayList<VehicleAction> vehicleActionList = new ArrayList<VehicleAction>();
+
+        //Setting up the gimbal stare vehicle action
+//         GimbalStareAction gimbalStareAction = new GimbalStareAction();
+//         gimbalStareAction.setPayloadID(1);
+//         gimbalStareAction.setDuration(1000000);
+//         
+        //Creating a 3D location object for the stare point
+        // Location3D location = new Location3D(1.52, -132.51, 0, afrl.cmasi.AltitudeType.MSL);
+        //gimbalStareAction.setStarepoint(location);
+        //Adding the gimbal stare action to the vehicle action list
+        vehicleActionList.add(flight);
+
+        o.getVehicleActionList().addAll(vehicleActionList);
+
+        //Sending the Vehicle Action Command message to AMASE to be interpreted
+        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
     }
 
     /**
@@ -224,7 +316,7 @@ public class zero extends Thread {
         o.setPerceivedZoneType(afrl.cmasi.searchai.HazardType.Fire);
         o.setEstimatedZoneDirection(0);
         o.setEstimatedZoneSpeed(0);
-        System.out.println(estimatedShape.toString());
+        //System.out.println(estimatedShape.toString());
         //Sending the Vehicle Action Command message to AMASE to be interpreted
         out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
     }
@@ -239,6 +331,7 @@ public class zero extends Thread {
         if (o instanceof afrl.cmasi.searchai.HazardZoneDetection) {
 
             HazardZoneDetection hazardDetected = ((HazardZoneDetection) o);
+            latestHazard = hazardDetected;
             //Get location where zone first detected
             Location3D detectedLocation = hazardDetected.getDetectedLocation();
             System.out.println("LAT: " + detectedLocation.getLatitude());
@@ -247,105 +340,181 @@ public class zero extends Thread {
             wayPointList.add(detectedLocation.getLatitude());
             wayPointList.add(detectedLocation.getLongitude());
             int detectingEntity = (int) hazardDetected.getDetectingEnitiyID();
-            if (numOfPoints < 64) {
-                if (detectingEntity == 1) {
-                    double latError = Math.abs((lastLat_1) - detectedLocation.getLatitude());
-                    double lonError = Math.abs((lastLon_1) - detectedLocation.getLongitude());
-                    if (latError > 0.001 && lonError > 0.001) {
-                        this.estimatedHazardZone.getBoundaryPoints().add(detectedLocation);
 
-                        sendEstimateReport(out, estimatedHazardZone);
-                        lastLat_1 =  detectedLocation.getLatitude();
-                        lastLon_1 =  detectedLocation.getLongitude();
-                        numOfPoints++;
-                    }
+            if (detectingEntity == 3) {
+                System.out.println("Uav " + detectingEntity + " found fire!!!");
 
-                } else if (detectingEntity == 2) {
-                    double latError = Math.abs((lastLat_2) - detectedLocation.getLatitude());
-                    double lonError = Math.abs((lastLon_2) - detectedLocation.getLongitude());
-                    if (latError > 0.001 && lonError > 0.001) {
-                        this.estimatedHazardZone.getBoundaryPoints().add(detectedLocation);
+                if (gimbalCommand.get(detectingEntity - 1) == 0) {
 
-                        sendEstimateReport(out, estimatedHazardZone);
-                    }
-                    lastLat_2 = (float) detectedLocation.getLatitude();
-                    lastLon_2 = (float) detectedLocation.getLongitude();
-                    numOfPoints++;
+                    //Add point to polygon and send the report
+                    estimatedHazardZoneUAV1.getBoundaryPoints().add(detectedLocation);
+                    sendEstimateReport(out, estimatedHazardZoneUAV1);
+
+                    System.out.println("Rotating Camera");
+                    sendSensorCommand(out, detectingEntity);
+                    gimbalCommand.set((detectingEntity - 1), 1);
+                    countMissedPoints++;
                 }
+                if (navCommand.get(detectingEntity - 1) == 1) {
+                    //we found fire change direction CCW
+                    System.out.println("2Current dir: " + latestAirStateUAV3.getHeading() + " askedHeading: " + headingDirUAV3);
+
+                    headingDirUAV3 = latestAirStateUAV3.getHeading();
+
+                    System.out.println("UAV: " + detectingEntity + " turning -12");
+                    headingDirUAV3 -= 12;
+                    //increment counter if points == 10 add current point to polygon
+                    countMissedPoints++;
+                    if (countMissedPoints == 10) {
+                        estimatedHazardZoneUAV1.getBoundaryPoints().add(detectedLocation);
+                        sendEstimateReport(out, estimatedHazardZoneUAV1);
+                        countMissedPoints = 0;
+                    }
+                    //send command to change direction
+                    FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, headingDirUAV3, latestAirStateUAV3.getLocation().getAltitude(), AltitudeType.MSL, 0);
+                    sendNavigationCommand(out, (int) detectingEntity, dir);
+                    if (headingDirUAV3 <= -180) {
+                        headingDirUAV3 += 360;
+                    }
+
+                    navCommand.set((detectingEntity - 1), 1);
+                }
+//                    
+            } else if (detectingEntity == 2) {
+//               
+                System.out.println("Uav " + detectingEntity + " found fire!!!");
+
+                if (gimbalCommand.get(detectingEntity - 1) == 0) {
+
+                    //Add point to polygon and send the report
+                    estimatedHazardZoneUAV2.getBoundaryPoints().add(detectedLocation);
+                    sendEstimateReport(out, estimatedHazardZoneUAV2);
+
+                    System.out.println("Rotating Camera");
+                    sendSensorCommand(out, detectingEntity);
+                    gimbalCommand.set((detectingEntity - 1), 1);
+                    countMissedPoints++;
+                }
+                if (navCommand.get(detectingEntity - 1) == 1) {
+                    //we found fire change direction CCW
+                    System.out.println("2Current dir: " + latestAirStateUAV2.getHeading() + " askedHeading: " + headingDirUAV2);
+
+                    headingDirUAV2 = latestAirStateUAV2.getHeading();
+
+                    System.out.println("UAV: " + detectingEntity + " turning -12");
+                    headingDirUAV2 -= 12;
+                    //increment counter if points == 10 add current point to polygon
+                    countMissedPoints++;
+                    if (countMissedPoints == 10) {
+                        estimatedHazardZoneUAV2.getBoundaryPoints().add(detectedLocation);
+                        sendEstimateReport(out, estimatedHazardZoneUAV2);
+                        countMissedPoints = 0;
+                    }
+                    //send command to change direction
+                    FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, headingDirUAV2, latestAirStateUAV2.getLocation().getAltitude(), AltitudeType.MSL, 0);
+                    sendNavigationCommand(out, (int) detectingEntity, dir);
+                    if (headingDirUAV2 <= -180) {
+                        headingDirUAV2 += 360;
+                    }
+
+                    navCommand.set((detectingEntity - 1), 1);
+                }
+
             }
 
-//            //Get entity that detected the zone
-//
-//            //Check if hint
-//            if (detectingEntity == 0) {
-//                //Do nothing for now, hints will be added later
-//                return;
-//            }
-//
-//            //Check if the UAV has already been sent the loiter command and proceed if it hasn't
-//            if (uavsLoiter[detectingEntity - 1] == false) {
-//                //Send the loiter command
-//                sendLoiterCommand(out, detectingEntity, detectedLocation);
-//
-//                //Note: Polygon points must be in clockwise or counter-clockwise order to get a shape without intersections
-//                estimatedHazardZone.getBoundaryPoints().add(detectedLocation);
-//
-//                //Send out the estimation report to draw the polygon
-//                sendEstimateReport(out, estimatedHazardZone);
-//
-//                uavsLoiter[detectingEntity - 1] = true;
-//                System.out.println("UAV" + detectingEntity + " detected hazard at " + detectedLocation.getLatitude()
-//                        + "," + detectedLocation.getLongitude() + ". Sending loiter command.");
-//            }
+//           
         } else if (o instanceof afrl.cmasi.AirVehicleState) {
             AirVehicleState uav = ((AirVehicleState) o);
             //System.out.println("UAV: " + uav.getID());
-           
+
             Location3D loc = uav.getLocation();
             //System.out.println("Lat: " + loc.getLatitude());
-            if (wayPointList.size() >= 6) {
-                if (uav.getID() == 2) {
-                    double latError = Math.abs((loc.getLatitude() - wayPointList.get(0)));
-                    double lonError = Math.abs((loc.getLongitude() - wayPointList.get(1)));
-                    lastLat_2 = wayPointList.get(0);
-                    lastLon_2 = wayPointList.get(1);
-                    if (latError < 0.0001 && lonError < 0.0001) {
 
-                        if (loiterCommand.get(1) == 0) {
-                            System.out.println("YEAH I AM THERE UAV 2");
-                            Location3D loitLoc = new Location3D(wayPointList.get(0), wayPointList.get(1), 100, afrl.cmasi.AltitudeType.MSL);
-                            this.sendLoiterCommand(out, 2, loitLoc);
-                            this.estimatedHazardZone.getBoundaryPoints().add(loitLoc);
+            if (uav.getID() == 2) {
+                latestAirStateUAV2 = uav;
+                if (gimbalCommand.get((int)uav.getID()-1) == 1 && navCommand.get((int)uav.getID()-1) == 0) {
+                    System.out.println("Change direction for UAV : " + uav.getID());
+                    headingDirUAV2 = uav.getHeading() - 90;
+                    FlightDirectorAction dir = new FlightDirectorAction(uav.getAirspeed(), SpeedType.Groundspeed, headingDirUAV2, uav.getLocation().getAltitude(), AltitudeType.MSL, 0);
+                    sendNavigationCommand(out, (int) uav.getID(), dir);
+                    navCommand.set((int)uav.getID()-1, 1);
+                }
+                if (navCommand.get((int) (uav.getID() - 1)) == 1) {
+                    System.out.println("Current dir: " + latestAirStateUAV2.getHeading() + " askedHeading: " + headingDirUAV2);
+                    System.out.println("Current time: " + scenarioTime + " elapsed: " + elapsedTIme);
+                    if (Math.abs(Math.abs(headingDirUAV2) - Math.abs(latestAirStateUAV2.getHeading())) < 10) {
+                        if (scenarioTime - elapsedTIme > 1000) {
+                            headingDirUAV2 = latestAirStateUAV2.getHeading();
 
-                            //loitLoc = new Location3D(wayPointList.get(4), wayPointList.get(5), 100, afrl.cmasi.AltitudeType.MSL);
-                            //this.estimatedHazardZone.getBoundaryPoints().add(loitLoc);
-                            //Send out the estimation report to draw the polygon
-                            sendEstimateReport(out, estimatedHazardZone);
-                            loiterCommand.set(1, 1);
+                            if (headingDirUAV2 > 0) {
+                                System.out.println("UAV: " + uav.getID() + " turning -5");
+                                headingDirUAV2 += 7;
+                            } else {
+                                System.out.println("UAV: " + uav.getID() + " turning +5");
+                                headingDirUAV2 += 7;
+                            }
+
+                            FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, headingDirUAV2, latestAirStateUAV2.getLocation().getAltitude(), AltitudeType.MSL, 0);
+                            sendNavigationCommand(out, (int) (uav.getID()), dir);
+                            navCommand.set(((int) (uav.getID() - 1)), 1);
+                            if (headingDirUAV2 > 180) {
+                                headingDirUAV2 -= 360;
+                            }
+                            elapsedTIme = scenarioTime;
+                        } else {
+                            System.out.println("Delay UAV: " + uav.getID());
                         }
-
-                    }
-                } else if (uav.getID() == 1) {
-                    double latError = Math.abs((loc.getLatitude() - wayPointList.get(2)));
-                    double lonError = Math.abs((loc.getLongitude() - wayPointList.get(3)));
-                    lastLat_1 = wayPointList.get(2);
-                    lastLon_1 = wayPointList.get(3);
-                    if (latError < 0.0001 && lonError < 0.0001) {
-                        if (loiterCommand.get(0) == 0) {
-                            System.out.println("YEAH I AM THERE UAV 1");
-                            Location3D loitLoc = new Location3D(wayPointList.get(2), wayPointList.get(3), 100, afrl.cmasi.AltitudeType.MSL);
-                            this.sendLoiterCommand(out, 1, loitLoc);
-                            this.estimatedHazardZone.getBoundaryPoints().add(loitLoc);
-                            //Send out the estimation report to draw the polygon
-                            sendEstimateReport(out, estimatedHazardZone);
-                            loiterCommand.set(0, 1);
-
-                        }
-
                     }
                 }
+
+                GimbalState gimbal = (GimbalState) uav.getPayloadStateList().get(0);
+                CameraState camera = (CameraState) uav.getPayloadStateList().get(1);
+
+                // System.out.println("Gimbal Rot:" + gimbal.getRotation());
+                // System.out.println("Camera Rot:" + camera.getRotation());
+            } else if (uav.getID() == 3) {
+                  latestAirStateUAV3 = uav;
+                if (gimbalCommand.get((int)uav.getID()-1) == 1 && navCommand.get((int)uav.getID()-1) == 0) {
+                    System.out.println("Change direction for UAV : " + uav.getID());
+                    headingDirUAV3 = uav.getHeading() - 90;
+                    FlightDirectorAction dir = new FlightDirectorAction(uav.getAirspeed(), SpeedType.Groundspeed, headingDirUAV3, uav.getLocation().getAltitude(), AltitudeType.MSL, 0);
+                    sendNavigationCommand(out, (int) uav.getID(), dir);
+                    navCommand.set((int)uav.getID()-1, 1);
+                }
+                if (navCommand.get((int) (uav.getID() - 1)) == 1) {
+                    System.out.println("Current dir: " + latestAirStateUAV3.getHeading() + " askedHeading: " + headingDirUAV3);
+                    System.out.println("Current time: " + scenarioTime + " elapsed: " + elapsedTIme);
+                    if (Math.abs(Math.abs(headingDirUAV3) - Math.abs(latestAirStateUAV3.getHeading())) < 10) {
+                        if (scenarioTime - elapsedTIme > 1000) {
+                            headingDirUAV3 = latestAirStateUAV3.getHeading();
+
+                            if (headingDirUAV3 > 0) {
+                                System.out.println("UAV: " + uav.getID() + " turning -5");
+                                headingDirUAV3 += 7;
+                            } else {
+                                System.out.println("UAV: " + uav.getID() + " turning +5");
+                                headingDirUAV3 += 7;
+                            }
+
+                            FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, headingDirUAV3, latestAirStateUAV3.getLocation().getAltitude(), AltitudeType.MSL, 0);
+                            sendNavigationCommand(out, (int) (uav.getID()), dir);
+                            navCommand.set(((int) (uav.getID() - 1)), 1);
+                            if (headingDirUAV3 > 180) {
+                                headingDirUAV3 -= 360;
+                            }
+                            elapsedTIme = scenarioTime;
+                        } else {
+                            System.out.println("Delay UAV: " + uav.getID());
+                        }
+                    }
+                }
+
             }
 
+        } else if (o instanceof afrl.cmasi.SessionStatus) {
+            //Example of using an incoming LMCP message
+            scenarioTime = ((SessionStatus) o).getScenarioTime();
+            //System.out.println(o.toString());
         }
     }
 
@@ -370,8 +539,10 @@ public class zero extends Thread {
             System.err.println("Could not Connect to " + host + ":" + port + ".  Trying again...");
             try {
                 Thread.sleep(500);
+
             } catch (InterruptedException ex1) {
-                Logger.getLogger(zero.class.getName()).log(Level.SEVERE, null, ex1);
+                Logger.getLogger(zero.class
+                        .getName()).log(Level.SEVERE, null, ex1);
             }
             return connect(host, port);
         }
