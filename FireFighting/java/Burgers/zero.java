@@ -34,6 +34,8 @@ import afrl.cmasi.Circle;
 import afrl.cmasi.FlightDirectorAction;
 import afrl.cmasi.GimbalAngleAction;
 import afrl.cmasi.GimbalState;
+import afrl.cmasi.KeepInZone;
+import afrl.cmasi.Rectangle;
 import afrl.cmasi.searchai.HazardZone;
 import afrl.cmasi.searchai.RecoveryPoint;
 import avtas.lmcp.LMCPFactory;
@@ -69,7 +71,7 @@ public class zero extends Thread {
     /**
      * Array of booleans indicating if loiter command has been sent to each UAV
      */
-        //this is to check if a uav is currently going home
+    //this is to check if a uav is currently going home
     private boolean returningHome = false;
     boolean[] uavsLoiter = new boolean[4];
     Polygon estimatedHazardZoneUAV1 = new Polygon();
@@ -122,6 +124,8 @@ public class zero extends Thread {
     private int currSizePolygon3 = 0;
     private static Location3D lastFire = null;
 
+    private static KeepInZone zone = null;
+
     int noThetas = 100;
     double xUAV1[] = new double[noThetas];
     double yUAV1[] = new double[noThetas];
@@ -131,6 +135,8 @@ public class zero extends Thread {
     double yUAV3[] = new double[noThetas];
     double xUAV4[] = new double[noThetas];
     double yUAV4[] = new double[noThetas];
+    double xUAV5[] = new double[noThetas];
+    double yUAV5[] = new double[noThetas];
 
     //vehicle type 0 = fixedWing
     //        type 1 = multi
@@ -168,12 +174,35 @@ public class zero extends Thread {
 
                     //FlightDirectorAction dir = new FlightDirectorAction(20, SpeedType.Groundspeed, 20, 700, AltitudeType.MSL, 0);
                     //sendNavigationCommand(socket.getOutputStream(), 2, dir);
-                    sendMissionCommand(socket.getOutputStream(), 1);
-                    sendMissionCommand(socket.getOutputStream(), 2);
-                    sendMissionCommand(socket.getOutputStream(), 3);
-                    sendMissionCommand(socket.getOutputStream(), 4);
-                    missionCommand = true;
+                    if (zone != null) {
+                        Rectangle rec = (Rectangle) zone.getBoundary();
+                        double tempLat = rec.getCenterPoint().getLatitude() + (rec.getHeight() / 110574) / 4;
+                        double tempLon = rec.getCenterPoint().getLongitude() + (rec.getWidth() / 111320 * Math.cos(tempLat * (Math.PI / 180))) / 2;
+                        System.out.println("lat: " + tempLat + " lon: " + tempLon);
+                        spiralMaker(tempLat, tempLon, xUAV1, yUAV1, noThetas);
 
+                        tempLat = rec.getCenterPoint().getLatitude();
+                        tempLon = rec.getCenterPoint().getLongitude() ;
+                        spiralMaker(tempLat, tempLon, xUAV2, yUAV2, noThetas);
+
+                        tempLat = rec.getCenterPoint().getLatitude() - (rec.getHeight() / 110574) / 4;
+                        tempLon = rec.getCenterPoint().getLongitude() + (rec.getWidth() / 111320 * Math.cos(tempLat * (Math.PI / 180))) / 2;
+                        spiralMaker(tempLat, tempLon, xUAV3, yUAV3, noThetas);
+
+                        tempLat = rec.getCenterPoint().getLatitude() + (rec.getHeight() / 110574) / 4;
+                        tempLon = rec.getCenterPoint().getLongitude() - (rec.getWidth() / 111320 * Math.cos(tempLat * (Math.PI / 180))) / 2;
+                        spiralMaker(tempLat, tempLon, xUAV4, yUAV4, noThetas);
+
+                        tempLat = rec.getCenterPoint().getLatitude() - (rec.getHeight() / 110574) / 4;
+                        tempLon = rec.getCenterPoint().getLongitude() - (rec.getWidth() / 111320 * Math.cos(tempLat * (Math.PI / 180))) / 2;
+                        spiralMaker(tempLat, tempLon, xUAV5, yUAV5, noThetas);
+                        sendMissionCommand(socket.getOutputStream(), 1);
+                        sendMissionCommand(socket.getOutputStream(), 2);
+                        sendMissionCommand(socket.getOutputStream(), 3);
+                        sendMissionCommand(socket.getOutputStream(), 4);
+                        sendMissionCommand(socket.getOutputStream(), 5);
+                        missionCommand = true;
+                    }
                     //sendMissionCommand(out,2,detectedLocation);
                 }
             }
@@ -183,70 +212,6 @@ public class zero extends Thread {
         }
     }
 
-//    public void sendMissionCommand(OutputStream out, int id) throws Exception {
-//        //Setting up the mission to send to the UAV
-//        MissionCommand o = new MissionCommand();
-//        o.setFirstWaypoint(1);
-//        //Setting the UAV to recieve the mission
-//        o.setVehicleID(id);
-//        o.setStatus(CommandStatusType.Pending);
-//        //Setting a unique mission command ID
-//        o.setCommandID(missionCount);
-//        missionCount++;
-//        //Creating the list of waypoints to be sent with the mission command
-//        ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
-//        //Creating the first waypoint
-//        //Note: all the following attributes must be set to avoid issues
-//        Waypoint waypoint1 = new Waypoint();
-//        //Setting 3D coordinates
-//        waypoint1.setLatitude(wayPointList.get(wayPointListCount));
-//        waypoint1.setLongitude(wayPointList.get(wayPointListCount + 1));
-//        waypoint1.setAltitude(100);
-//        waypoint1.setAltitudeType(AltitudeType.MSL);
-//        //Setting unique ID for the waypoint
-//        waypoint1.setNumber(1);
-//
-//        //Setting speed to reach the waypoint
-//        waypoint1.setSpeed(20);
-//        waypoint1.setSpeedType(SpeedType.Airspeed);
-//
-//        //Setting the climb rate to reach new altitude (if applicable)
-//        waypoint1.setClimbRate(0);
-//        waypoint1.setTurnType(TurnType.TurnShort);
-//        //Setting backup waypoints if new waypoint can't be reached
-//        waypoint1.setContingencyWaypointA(0);
-//        waypoint1.setContingencyWaypointB(0);
-//        /* 
-//		  waypoint1.setNextWaypoint(2);
-//		  
-//		  
-//         //Setting up the second waypoint to be sent in the mission command
-//         Waypoint waypoint2 = new Waypoint();
-//         waypoint2.setLatitude((Double)wayPointList.get(2));
-//         waypoint2.setLongitude((Double)wayPointList.get(3));
-//         waypoint2.setAltitude(100);
-//         waypoint2.setAltitudeType(AltitudeType.MSL);
-//         waypoint2.setNumber(2);
-//         waypoint2.setNextWaypoint(1);
-//         waypoint2.setSpeed(30);
-//         waypoint2.setSpeedType(SpeedType.Airspeed);
-//         waypoint2.setClimbRate(0);
-//         waypoint2.setTurnType(TurnType.TurnShort);
-//         waypoint2.setContingencyWaypointA(0);
-//         waypoint2.setContingencyWaypointB(0);  */
-//
-//        //Adding the waypoints to the waypoint list
-//        waypoints.add(waypoint1);
-//        // waypoints.add(waypoint2);
-//
-//        //Setting the waypoint list in the mission command
-//        o.getWaypointList().addAll(waypoints);
-//
-//        //Sending the Mission Command message to AMASE to be interpreted
-//        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
-//        wayPointNumber++;
-//        wayPointListCount += 2;
-//    }
     public void sendMissionCommand(OutputStream out, int id) throws Exception {
         //Setting up the mission to send to the UAV
 
@@ -266,42 +231,11 @@ public class zero extends Thread {
 
         //Creating the list of waypoints to be sent with the mission command
         ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
-        spiralMaker(53.4750, -1.8351, xUAV1, yUAV1, noThetas);
-        spiralMaker(53.4750, -1.6956, xUAV2, yUAV2, noThetas);
-        spiralMaker(53.412, -1.8335, xUAV3, yUAV3, noThetas);
-        spiralMaker(53.412, -1.6898, xUAV4, yUAV4, noThetas);
 
         int waypointnum = noThetas;
         for (int i = 1; i < waypointnum; i++) {
             Waypoint waypointDev = new Waypoint();
-            //System.out.print("This is waypoint " + i);
-            //double randomLongitude = 0;
-            //double randomLatitude = 0;
 
-            /* if(i > 1)
-            {
-                int decide = getRandomIntegerBetweenRange(1,4);
-                if(decide == 1)
-                {
-                    randomLongitude = new Random().nextDouble() * 0.04;
-                    randomLatitude = new Random().nextDouble() * 0.04;
-                }
-                else if (decide == 2)
-                {
-                    randomLongitude = new Random().nextDouble() * -0.04;
-                    randomLatitude = new Random().nextDouble() * 0.04;
-                }
-                else if (decide == 3)
-                {
-                    randomLongitude = new Random().nextDouble() * 0.04;
-                    randomLatitude = new Random().nextDouble() * -0.04;
-                }
-                else
-                {
-                    randomLongitude = new Random().nextDouble() * -0.04;
-                    randomLatitude = new Random().nextDouble() * -0.04;
-                } 
-            }*/
             if (id == 1) {
 
                 waypointDev.setLatitude(xUAV1[i]);
@@ -327,11 +261,17 @@ public class zero extends Thread {
                 waypointDev.setLongitude(yUAV4[i]);
                 waypointDev.setAltitude(1000);
             }
-            if (waypointDev.getLatitude() > 53.5340) {
-                waypointDev.setLatitude(53.3772);
-                waypointDev.setLongitude(-1.762);
+            if (id == 5) {
 
+                waypointDev.setLatitude(xUAV5[i]);
+                waypointDev.setLongitude(yUAV5[i]);
+                waypointDev.setAltitude(1000);
             }
+//            if (waypointDev.getLatitude() > 53.5340) {
+//               // waypointDev.setLatitude(53.3772);
+//                //waypointDev.setLongitude(-1.762);
+//
+//            }
             waypointDev.setAltitude(700);
             waypointDev.setAltitudeType(AltitudeType.MSL);
             //Setting unique ID for the waypoint
@@ -596,6 +536,9 @@ public class zero extends Thread {
             //System.out.println(refuelLoc.toString());
         } else if (o instanceof afrl.cmasi.AirVehicleConfiguration) {
             newDrone((AirVehicleConfiguration) o);
+        } else if (o instanceof afrl.cmasi.KeepInZone) {
+            zone = (KeepInZone) o;
+
         }
     }
 
@@ -872,19 +815,18 @@ public class zero extends Thread {
         wayPointListCount += 2;
 
     }
+
     //check if the battery of the uav is low
     public boolean isBatteryLow(AirVehicleState uav) {
-        
-       double batteryPercentage = uav.getEnergyAvailable();
-       
-       if(batteryPercentage < 30)
-       {
-           //System.out.print(batteryPercentage);
-           return true;
-       }
-       return false;
+
+        double batteryPercentage = uav.getEnergyAvailable();
+
+        if (batteryPercentage < 30) {
+            //System.out.print(batteryPercentage);
+            return true;
+        }
+        return false;
     }
- 
 
     public static void main(String[] args) {
         new zero().start();
