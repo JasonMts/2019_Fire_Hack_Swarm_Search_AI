@@ -571,7 +571,7 @@ public class zero extends Thread {
 
             boolean batterylow = isBatteryLow(uav);
 
-            System.out.println("Batter: " + batterylow + " return: " + returningHome);
+            //System.out.println("Batter: " + batterylow + " return: " + returningHome);
             //System.out.println("Batter: " + batterylow + " return: " + returningHome);
             if (batterylow && (returningHome == false)) {
                 returningHome = true;
