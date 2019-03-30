@@ -9,7 +9,6 @@ package Burgers;
 // Title 17, U.S. Code.  All Other Rights Reserved.
 // ===============================================================================
 // This file was auto-created by LmcpGen. Modifications will be overwritten.
-import afrl.cmasi.AbstractGeometry;
 import afrl.cmasi.AirVehicleState;
 import afrl.cmasi.searchai.HazardZoneDetection;
 import afrl.cmasi.searchai.HazardZoneEstimateReport;
@@ -33,8 +32,6 @@ import afrl.cmasi.Circle;
 import afrl.cmasi.FlightDirectorAction;
 import afrl.cmasi.GimbalAngleAction;
 import afrl.cmasi.GimbalState;
-import afrl.cmasi.searchai.HazardZone;
-import afrl.cmasi.searchai.RecoveryPoint;
 import avtas.lmcp.LMCPFactory;
 import avtas.lmcp.LMCPObject;
 import java.io.IOException;
@@ -46,6 +43,7 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Random;
 
@@ -72,9 +70,12 @@ public class zero extends Thread {
 
     public int wayPointNumber = 1;
     public int missionCount = 1;
-
+    boolean missionCommand = false;
+    
+    
     public int numOfPoints = 0;
     List<Double> wayPointList = new ArrayList<>();
+    
     List<Integer> loiterCommand = new ArrayList<>();
     List<Integer> gimbalCommand = new ArrayList<>();
     List<Integer> navCommand = new ArrayList<>();
@@ -86,6 +87,11 @@ public class zero extends Thread {
     double lastLon_1 = 0;
     double lastLat_2 = 0;
     double lastLon_2 = 0;
+    
+    public static int getRandomIntegerBetweenRange(int min, int max){
+        int x = (int)(Math.random()*((max-min)+1))+min;
+        return x;
+    }
 
     float headingDirUAV1 = 0;
     float headingDirUAV2 = 0;
@@ -125,10 +131,6 @@ private static int countMissedPoints3 = 0;
     double yUAV3[] = new double[noThetas];
     double xUAV4[] = new double[noThetas];
     double yUAV4[] = new double[noThetas];
-    
-    
-    
-    Location3D refuelLoc = null;
 
     public zero() {
     }
@@ -139,7 +141,7 @@ private static int countMissedPoints3 = 0;
 
             // connect to the server
             Socket socket = connect(host, port);
-            boolean missionCommand = false;
+            
             loiterCommand.add(0);
             loiterCommand.add(0);
             loiterCommand.add(0);
@@ -157,6 +159,12 @@ private static int countMissedPoints3 = 0;
                 //Continually read the LMCP messages that AMASE is sending out
                 readMessages(socket.getInputStream(), socket.getOutputStream());
                 if (missionCommand == false) {
+               //     if (wayPointList.size() == 6) 
+                    sendMissionCommand(socket.getOutputStream(), 1);
+                    sendMissionCommand(socket.getOutputStream(), 2);
+                    sendMissionCommand(socket.getOutputStream(), 3);
+                    sendMissionCommand(socket.getOutputStream(), 4);
+                //    }
 
                     //FlightDirectorAction dir = new FlightDirectorAction(20, SpeedType.Groundspeed, 20, 700, AltitudeType.MSL, 0);
                     //sendNavigationCommand(socket.getOutputStream(), 2, dir);
@@ -168,7 +176,10 @@ private static int countMissedPoints3 = 0;
 
                     //sendMissionCommand(out,2,detectedLocation);
                 }
+            //Arrays.toString(wayPointList.toArray()); 
+            
             }
+
 
         } catch (Exception ex) {
             Logger.getLogger(zero.class.getName()).log(Level.SEVERE, null, ex);
@@ -241,6 +252,7 @@ private static int countMissedPoints3 = 0;
 //    }
     public void sendMissionCommand(OutputStream out, int id) throws Exception {
         //Setting up the mission to send to the UAV
+<<<<<<< HEAD
 
         //We will now have 4 missions
         ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
@@ -248,6 +260,16 @@ private static int countMissedPoints3 = 0;
         //one for each drone
         MissionCommand o = new MissionCommand();
 
+=======
+        
+        //We will now have 4 missions
+        ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
+        
+
+       //one for each drone
+        MissionCommand o = new MissionCommand();
+        
+>>>>>>> 24d4118eaaf4c2e908c962fdc0e72068d1b02f17
         o.setFirstWaypoint(1);
         //Setting the UAV to recieve the mission
         o.setVehicleID(id);
@@ -255,6 +277,7 @@ private static int countMissedPoints3 = 0;
         //Setting a unique mission command ID
         o.setCommandID(missionCount);
         missionCount++;
+<<<<<<< HEAD
 
         //Creating the list of waypoints to be sent with the mission command
         ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
@@ -264,14 +287,49 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
         spiralMaker(53.412, -1.6898, xUAV4 , yUAV4,noThetas);
 
         int waypointnum = noThetas;
+=======
+        
+
+        //Creating the list of waypoints to be sent with the mission command
+        ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
+        //Creating the first waypoint
+        //Note: all the following attributes must be set to avoid issues
+        //Waypoint waypoint1 = new Waypoint();
+        //Setting 3D coordinates
+       
+//        waypoint1.setAltitude(1000);
+//        waypoint1.setAltitudeType(AltitudeType.MSL);
+//        //Setting unique ID for the waypoint
+//        waypoint1.setNumber(1);
+//
+//        //Setting speed to reach the waypoint
+//        waypoint1.setSpeed(100);
+//        waypoint1.setSpeedType(SpeedType.Airspeed);
+//        g
+//       //Setting the climb rate to reach new altitude (if applicable)
+//        waypoint1.setClimbRate(100);
+//        waypoint1.setTurnType(TurnType.TurnShort);
+//        //Setting backup waypoints if new waypoint can't be reached
+//        waypoint1.setContingencyWaypointA(0);
+//        waypoint1.setContingencyWaypointB(0);
+//                
+        int waypointnum = 15;
+>>>>>>> 24d4118eaaf4c2e908c962fdc0e72068d1b02f17
         for(int i = 1; i < waypointnum; i++)
         {
             Waypoint waypointDev = new Waypoint();
-            //System.out.print("This is waypoint " + i);
+            System.out.print("This is waypoint " + i);
+<<<<<<< HEAD
             //double randomLongitude = 0;
             //double randomLatitude = 0;
          
            /* if(i > 1)
+=======
+            double randomLongitude = 0;
+            double randomLatitude = 0;
+             
+            if(i > 1)
+>>>>>>> 24d4118eaaf4c2e908c962fdc0e72068d1b02f17
             {
                 int decide = getRandomIntegerBetweenRange(1,4);
                 if(decide == 1)
@@ -293,6 +351,7 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                 {
                     randomLongitude = new Random().nextDouble() * -0.04;
                     randomLatitude = new Random().nextDouble() * -0.04;
+<<<<<<< HEAD
                 } 
             }*/
             if(id == 1)
@@ -300,25 +359,46 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                 
                 waypointDev.setLatitude(xUAV1[i]);
                 waypointDev.setLongitude(yUAV1[i]);
+=======
+                }
+                
+               
+            }
+            if(id == 1)
+            {
+                waypointDev.setLatitude(53.3935 + randomLatitude);
+                waypointDev.setLongitude(-1.857 + randomLongitude);
+>>>>>>> 24d4118eaaf4c2e908c962fdc0e72068d1b02f17
                 waypointDev.setAltitude(1000);
                 
             }
             if(id == 2)
             {
+<<<<<<< HEAD
                 
                 waypointDev.setLatitude(xUAV2[i]);
                 waypointDev.setLongitude(yUAV2[i]);
+=======
+                waypointDev.setLatitude(53.5031 + randomLatitude);
+                waypointDev.setLongitude(-1.673 + randomLongitude);
+>>>>>>> 24d4118eaaf4c2e908c962fdc0e72068d1b02f17
                 waypointDev.setAltitude(1000);
             }
             if(id == 3)
             {
+<<<<<<< HEAD
                 
                 waypointDev.setLatitude(xUAV3[i]);
                 waypointDev.setLongitude(yUAV3[i]);
+=======
+                waypointDev.setLatitude(53.4855 + randomLatitude);
+                waypointDev.setLongitude(-1.859 + randomLongitude);
+>>>>>>> 24d4118eaaf4c2e908c962fdc0e72068d1b02f17
                 waypointDev.setAltitude(1000);
             }
             if(id == 4)
             {
+<<<<<<< HEAD
                 
                 waypointDev.setLatitude(xUAV4[i]);
                 waypointDev.setLongitude(yUAV4[i]);
@@ -338,12 +418,29 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
             waypointDev.setSpeed(100);
             waypointDev.setSpeedType(SpeedType.Airspeed);
 
+=======
+                waypointDev.setLatitude(53.3891 + randomLatitude);
+                waypointDev.setLongitude(-1.691 + randomLongitude);
+                waypointDev.setAltitude(1000);
+            }
+            
+            waypointDev.setAltitude(1000);
+            waypointDev.setAltitudeType(AltitudeType.MSL);
+            //Setting unique ID for the waypoint
+            waypointDev.setNumber(i);
+            
+            //Setting speed to reach the waypoint
+            waypointDev.setSpeed(100);
+            waypointDev.setSpeedType(SpeedType.Airspeed);
+            
+>>>>>>> 24d4118eaaf4c2e908c962fdc0e72068d1b02f17
             //Setting the climb rate to reach new altitude (if applicable)
             waypointDev.setClimbRate(100);
             waypointDev.setTurnType(TurnType.TurnShort);
             //Setting backup waypoints if new waypoint can't be reached
             waypointDev.setContingencyWaypointA(0);
             waypointDev.setContingencyWaypointB(0);
+<<<<<<< HEAD
 
             if (i != waypointnum - 1) {
                 waypointDev.setNextWaypoint(i + 1);
@@ -406,6 +503,39 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
         // waypointDev.setNextWaypoint(i + 1);
         waypoints.add(waypointDev);
 
+=======
+            
+            if(i != waypointnum - 1)
+                waypointDev.setNextWaypoint(i+1);   
+            
+            waypoints.add(waypointDev);
+            
+                
+        }
+        /* 
+		  waypoint1.setNextWaypoint(2);
+		  
+        
+         //Setting up the second waypoint to be sent in the mission command
+         Waypoint waypoint2 = new Waypoint();
+         waypoint2.setLatitude((Double)wayPointList.get(2));
+         waypoint2.setLongitude((Double)wayPointList.get(3));
+         waypoint2.setAltitude(100);
+         waypoint2.setAltitudeType(AltitudeType.MSL);
+         waypoint2.setNumber(2);
+         waypoint2.setNextWaypoint(1);
+         waypoint2.setSpeed(30);
+         waypoint2.setSpeedType(SpeedType.Airspeed);
+         waypoint2.setClimbRate(0);
+         waypoint2.setTurnType(TurnType.TurnShort);
+         waypoint2.setContingencyWaypointA(0);
+         waypoint2.setContingencyWaypointB(0);  */
+
+        //Adding the waypoints to the waypoint list
+        //waypoints.add(waypoint1);
+        //waypoints.add(waypoint2);
+       
+>>>>>>> 24d4118eaaf4c2e908c962fdc0e72068d1b02f17
         //Setting the waypoint list in the mission command
         o.getWaypointList().addAll(waypoints);
 
@@ -492,7 +622,7 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
         //Setting up the loiter action
         LoiterAction loiterAction = new LoiterAction();
         loiterAction.setLoiterType(LoiterType.Circular);
-        loiterAction.setRadius(100);
+        loiterAction.setRadius(10000);
         loiterAction.setAxis(0);
         loiterAction.setLength(0);
         loiterAction.setDirection(LoiterDirection.Clockwise);
@@ -813,13 +943,6 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
             //Example of using an incoming LMCP message
             scenarioTime = ((SessionStatus) o).getScenarioTime();
             //System.out.println(o.toString());
-        }else if (o instanceof afrl.cmasi.searchai.RecoveryPoint) {
-            RecoveryPoint recovery = (RecoveryPoint) o;
-            Circle boundary = (Circle) recovery.getBoundary();
-            
-            refuelLoc =  boundary.getCenterPoint();
-            refuelLoc.setAltitude(700);
-            //System.out.println(refuelLoc.toString());
         }
     }
 
@@ -878,7 +1001,7 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                     x[i]  = myLong + a*Math.exp(b*theta[i])*Math.cos(Math.toRadians(theta[i]));
                     y[i]  = myLat + a*Math.exp(b*theta[i])*Math.sin(Math.toRadians(theta[i]));
                     // print the values
-                    //System.out.printf("i: %d x[i] = %f, y[i] = %f theta: %f\n",i,x[i],y[i],theta[i]);
+                    System.out.printf("i: %d x[i] = %f, y[i] = %f theta: %f\n",i,x[i],y[i],theta[i]);
             }
     }	
 
