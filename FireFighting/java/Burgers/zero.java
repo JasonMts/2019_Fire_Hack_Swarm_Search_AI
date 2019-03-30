@@ -39,7 +39,9 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Random;
 
 /**
  * Connects to the simulation and sends a fake mission command to every UAV that
@@ -63,9 +65,12 @@ public class zero extends Thread {
 
     public int wayPointNumber = 1;
     public int missionCount = 1;
-
+    boolean missionCommand = false;
+    
+    
     public int numOfPoints = 0;
     List<Double> wayPointList = new ArrayList<>();
+    
     List<Integer> loiterCommand = new ArrayList<>();
     int wayPointListCount = 0;
 
@@ -75,6 +80,11 @@ public class zero extends Thread {
     double lastLon_1 = 0;
     double lastLat_2 = 0;
     double lastLon_2 = 0;
+    
+    public static int getRandomIntegerBetweenRange(int min, int max){
+        int x = (int)(Math.random()*((max-min)+1))+min;
+        return x;
+    }
 
     public zero() {
     }
@@ -85,24 +95,27 @@ public class zero extends Thread {
 
             // connect to the server
             Socket socket = connect(host, port);
-            boolean missionCommand = false;
+            
             loiterCommand.add(0);
             loiterCommand.add(0);
             while (true) {
                 //Continually read the LMCP messages that AMASE is sending out
                 readMessages(socket.getInputStream(), socket.getOutputStream());
                 if (missionCommand == false) {
-                    if (wayPointList.size() == 6) {
-                        //sendMissionCommand(socket.getOutputStream(),1);
-                        sendMissionCommand(socket.getOutputStream(), 2);
+               //     if (wayPointList.size() == 6) {
                         sendMissionCommand(socket.getOutputStream(), 1);
-
+                        sendMissionCommand(socket.getOutputStream(), 2);
+                        sendMissionCommand(socket.getOutputStream(), 3);
+                        sendMissionCommand(socket.getOutputStream(), 4);
                         missionCommand = true;
-                    }
+                //    }
 
                     //sendMissionCommand(out,2,detectedLocation);
                 }
+            //Arrays.toString(wayPointList.toArray()); 
+            
             }
+
 
         } catch (Exception ex) {
             Logger.getLogger(zero.class.getName()).log(Level.SEVERE, null, ex);
@@ -111,7 +124,14 @@ public class zero extends Thread {
 
     public void sendMissionCommand(OutputStream out, int id) throws Exception {
         //Setting up the mission to send to the UAV
+        
+        //We will now have 4 missions
+        ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
+        
+
+       //one for each drone
         MissionCommand o = new MissionCommand();
+        
         o.setFirstWaypoint(1);
         //Setting the UAV to recieve the mission
         o.setVehicleID(id);
@@ -119,33 +139,118 @@ public class zero extends Thread {
         //Setting a unique mission command ID
         o.setCommandID(missionCount);
         missionCount++;
+        
+
         //Creating the list of waypoints to be sent with the mission command
         ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
         //Creating the first waypoint
         //Note: all the following attributes must be set to avoid issues
-        Waypoint waypoint1 = new Waypoint();
+        //Waypoint waypoint1 = new Waypoint();
         //Setting 3D coordinates
-        waypoint1.setLatitude(wayPointList.get(wayPointListCount));
-        waypoint1.setLongitude(wayPointList.get(wayPointListCount + 1));
-        waypoint1.setAltitude(100);
-        waypoint1.setAltitudeType(AltitudeType.MSL);
-        //Setting unique ID for the waypoint
-        waypoint1.setNumber(1);
-
-        //Setting speed to reach the waypoint
-        waypoint1.setSpeed(20);
-        waypoint1.setSpeedType(SpeedType.Airspeed);
-         
-       //Setting the climb rate to reach new altitude (if applicable)
-        waypoint1.setClimbRate(0);
-        waypoint1.setTurnType(TurnType.TurnShort);
-        //Setting backup waypoints if new waypoint can't be reached
-        waypoint1.setContingencyWaypointA(0);
-        waypoint1.setContingencyWaypointB(0);
+       
+//        waypoint1.setAltitude(1000);
+//        waypoint1.setAltitudeType(AltitudeType.MSL);
+//        //Setting unique ID for the waypoint
+//        waypoint1.setNumber(1);
+//
+//        //Setting speed to reach the waypoint
+//        waypoint1.setSpeed(100);
+//        waypoint1.setSpeedType(SpeedType.Airspeed);
+//        g
+//       //Setting the climb rate to reach new altitude (if applicable)
+//        waypoint1.setClimbRate(100);
+//        waypoint1.setTurnType(TurnType.TurnShort);
+//        //Setting backup waypoints if new waypoint can't be reached
+//        waypoint1.setContingencyWaypointA(0);
+//        waypoint1.setContingencyWaypointB(0);
+//                
+        int waypointnum = 15;
+        for(int i = 1; i < waypointnum; i++)
+        {
+            Waypoint waypointDev = new Waypoint();
+            System.out.print("This is waypoint " + i);
+            double randomLongitude = 0;
+            double randomLatitude = 0;
+             
+            if(i > 1)
+            {
+                int decide = getRandomIntegerBetweenRange(1,4);
+                if(decide == 1)
+                {
+                    randomLongitude = new Random().nextDouble() * 0.04;
+                    randomLatitude = new Random().nextDouble() * 0.04;
+                }
+                else if (decide == 2)
+                {
+                    randomLongitude = new Random().nextDouble() * -0.04;
+                    randomLatitude = new Random().nextDouble() * 0.04;
+                }
+                else if (decide == 3)
+                {
+                    randomLongitude = new Random().nextDouble() * 0.04;
+                    randomLatitude = new Random().nextDouble() * -0.04;
+                }
+                else
+                {
+                    randomLongitude = new Random().nextDouble() * -0.04;
+                    randomLatitude = new Random().nextDouble() * -0.04;
+                }
+                
+               
+            }
+            if(id == 1)
+            {
+                waypointDev.setLatitude(53.3935 + randomLatitude);
+                waypointDev.setLongitude(-1.857 + randomLongitude);
+                waypointDev.setAltitude(1000);
+                
+            }
+            if(id == 2)
+            {
+                waypointDev.setLatitude(53.5031 + randomLatitude);
+                waypointDev.setLongitude(-1.673 + randomLongitude);
+                waypointDev.setAltitude(1000);
+            }
+            if(id == 3)
+            {
+                waypointDev.setLatitude(53.4855 + randomLatitude);
+                waypointDev.setLongitude(-1.859 + randomLongitude);
+                waypointDev.setAltitude(1000);
+            }
+            if(id == 4)
+            {
+                waypointDev.setLatitude(53.3891 + randomLatitude);
+                waypointDev.setLongitude(-1.691 + randomLongitude);
+                waypointDev.setAltitude(1000);
+            }
+            
+            waypointDev.setAltitude(1000);
+            waypointDev.setAltitudeType(AltitudeType.MSL);
+            //Setting unique ID for the waypoint
+            waypointDev.setNumber(i);
+            
+            //Setting speed to reach the waypoint
+            waypointDev.setSpeed(100);
+            waypointDev.setSpeedType(SpeedType.Airspeed);
+            
+            //Setting the climb rate to reach new altitude (if applicable)
+            waypointDev.setClimbRate(100);
+            waypointDev.setTurnType(TurnType.TurnShort);
+            //Setting backup waypoints if new waypoint can't be reached
+            waypointDev.setContingencyWaypointA(0);
+            waypointDev.setContingencyWaypointB(0);
+            
+            if(i != waypointnum - 1)
+                waypointDev.setNextWaypoint(i+1);   
+            
+            waypoints.add(waypointDev);
+            
+                
+        }
         /* 
 		  waypoint1.setNextWaypoint(2);
 		  
-		  
+        
          //Setting up the second waypoint to be sent in the mission command
          Waypoint waypoint2 = new Waypoint();
          waypoint2.setLatitude((Double)wayPointList.get(2));
@@ -162,8 +267,8 @@ public class zero extends Thread {
          waypoint2.setContingencyWaypointB(0);  */
 
         //Adding the waypoints to the waypoint list
-        waypoints.add(waypoint1);
-        // waypoints.add(waypoint2);
+        //waypoints.add(waypoint1);
+        //waypoints.add(waypoint2);
        
         //Setting the waypoint list in the mission command
         o.getWaypointList().addAll(waypoints);
@@ -191,7 +296,7 @@ public class zero extends Thread {
         //Setting up the loiter action
         LoiterAction loiterAction = new LoiterAction();
         loiterAction.setLoiterType(LoiterType.Circular);
-        loiterAction.setRadius(100);
+        loiterAction.setRadius(10000);
         loiterAction.setAxis(0);
         loiterAction.setLength(0);
         loiterAction.setDirection(LoiterDirection.Clockwise);
@@ -341,6 +446,7 @@ public class zero extends Thread {
                             loiterCommand.set(0, 1);
 
                         }
+                        
 
                     }
                 }
