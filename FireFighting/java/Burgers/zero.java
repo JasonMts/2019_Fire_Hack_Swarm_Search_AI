@@ -111,6 +111,17 @@ private static int countMissedPoints3 = 0;
     
     private int currSizePolygon3 = 0;
     private static Location3D lastFire = null;
+    
+    
+    int noThetas = 100;
+    double xUAV1[] = new double[noThetas];
+    double yUAV1[] = new double[noThetas];
+    double xUAV2[] = new double[noThetas];
+    double yUAV2[] = new double[noThetas];
+    double xUAV3[] = new double[noThetas];
+    double yUAV3[] = new double[noThetas];
+    double xUAV4[] = new double[noThetas];
+    double yUAV4[] = new double[noThetas];
 
     public zero() {
     }
@@ -240,53 +251,71 @@ private static int countMissedPoints3 = 0;
 
         //Creating the list of waypoints to be sent with the mission command
         ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
+spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
+        spiralMaker(53.4750, -1.6956, xUAV2 , yUAV2,noThetas);
+        spiralMaker(53.412, -1.8335, xUAV3 , yUAV3,noThetas);
+        spiralMaker(53.412, -1.6898, xUAV4 , yUAV4,noThetas);
 
-        int waypointnum = 10;
-        double randomLongitude = 0;
-        double randomLatitude = 0;
-        for (int i = 1; i < waypointnum; i++) {
+        int waypointnum = noThetas;
+        for(int i = 1; i < waypointnum; i++)
+        {
             Waypoint waypointDev = new Waypoint();
-            //System.out.print("This is waypoint " + i);
-
-            if (i > 1) {
-                int decide = getRandomIntegerBetweenRange(1, 4);
-                if (decide == 1) {
+            System.out.print("This is waypoint " + i);
+            //double randomLongitude = 0;
+            //double randomLatitude = 0;
+         
+           /* if(i > 1)
+            {
+                int decide = getRandomIntegerBetweenRange(1,4);
+                if(decide == 1)
+                {
                     randomLongitude = new Random().nextDouble() * 0.04;
-                    //randomLatitude = new Random().nextDouble() * 0.04;
-                } else if (decide == 2) {
-                    randomLongitude = new Random().nextDouble() * -0.04;
-                    //randomLatitude = new Random().nextDouble() * 0.04;
-                } else if (decide == 3) {
-                    randomLongitude = new Random().nextDouble() * 0.04;
-                    //randomLatitude = new Random().nextDouble() * -0.04;
-                } else {
-                    randomLongitude = new Random().nextDouble() * -0.04;
-                    // randomLatitude = new Random().nextDouble() * -0.04;
+                    randomLatitude = new Random().nextDouble() * 0.04;
                 }
-                randomLatitude += new Random().nextDouble() * 0.02;
-
+                else if (decide == 2)
+                {
+                    randomLongitude = new Random().nextDouble() * -0.04;
+                    randomLatitude = new Random().nextDouble() * 0.04;
+                }
+                else if (decide == 3)
+                {
+                    randomLongitude = new Random().nextDouble() * 0.04;
+                    randomLatitude = new Random().nextDouble() * -0.04;
+                }
+                else
+                {
+                    randomLongitude = new Random().nextDouble() * -0.04;
+                    randomLatitude = new Random().nextDouble() * -0.04;
+                } 
+            }*/
+            if(id == 1)
+            {
+                
+                waypointDev.setLatitude(xUAV1[i]);
+                waypointDev.setLongitude(yUAV1[i]);
+                waypointDev.setAltitude(1000);
+                
             }
-            if (id == 1) {
-                waypointDev.setLatitude(53.4483 + randomLatitude);
-                waypointDev.setLongitude(-1.7106 + randomLongitude);
-                waypointDev.setAltitude(700);
-
+            if(id == 2)
+            {
+                
+                waypointDev.setLatitude(xUAV2[i]);
+                waypointDev.setLongitude(yUAV2[i]);
+                waypointDev.setAltitude(1000);
             }
-            if (id == 2) {
-                waypointDev.setLatitude(53.3799 + randomLatitude);
-                waypointDev.setLongitude(-1.661 + randomLongitude);
-                waypointDev.setAltitude(700);
+            if(id == 3)
+            {
+                
+                waypointDev.setLatitude(xUAV3[i]);
+                waypointDev.setLongitude(yUAV3[i]);
+                waypointDev.setAltitude(1000);
             }
-            if (id == 4) {
-                waypointDev.setLatitude(53.3766 + randomLatitude);
-                waypointDev.setLongitude(-1.8775 + randomLongitude);
-                waypointDev.setAltitude(700);
-            }
-
-            if (id == 3) {
-                waypointDev.setLatitude(53.4575 + randomLatitude);
-                waypointDev.setLongitude(-1.8421 + randomLongitude);
-                waypointDev.setAltitude(700);
+            if(id == 4)
+            {
+                
+                waypointDev.setLatitude(xUAV4[i]);
+                waypointDev.setLongitude(yUAV4[i]);
+                waypointDev.setAltitude(1000);
             }
             if (waypointDev.getLatitude() > 53.5340) {
                 waypointDev.setLatitude(53.3772);
@@ -816,6 +845,28 @@ private static int countMissedPoints3 = 0;
         int x = (int) (Math.random() * ((max - min) + 1)) + min;
         return x;
     }
+    public static void spiralMaker(double myLong, double myLat,double x[] ,double y[], int noThetas) {
+            double theta[] = new double[noThetas];
+            
+            double b = 0.0018;
+            double a = 0.019;
+
+            double inc =  720/noThetas;
+            for (int i = 0; i< noThetas; i++){
+                theta[i] = 0;
+            }
+            for (int i = 0; i< noThetas; i++){
+                theta[i] = i*inc;
+            }
+                        
+            for (int i = 0; i< noThetas; i++) {
+
+                    x[i]  = myLong + a*Math.exp(b*theta[i])*Math.cos(Math.toRadians(theta[i]));
+                    y[i]  = myLat + a*Math.exp(b*theta[i])*Math.sin(Math.toRadians(theta[i]));
+                    // print the values
+                    System.out.printf("i: %d x[i] = %f, y[i] = %f theta: %f\n",i,x[i],y[i],theta[i]);
+            }
+    }	
 
     public static void main(String[] args) {
         new zero().start();
