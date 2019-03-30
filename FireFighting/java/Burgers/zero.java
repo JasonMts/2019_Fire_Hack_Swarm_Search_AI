@@ -30,6 +30,7 @@ import afrl.cmasi.VehicleActionCommand;
 import afrl.cmasi.Waypoint;
 import afrl.cmasi.Polygon;
 import afrl.cmasi.Circle;
+import afrl.cmasi.EntityState;
 import afrl.cmasi.FlightDirectorAction;
 import afrl.cmasi.GimbalAngleAction;
 import afrl.cmasi.GimbalState;
@@ -95,7 +96,7 @@ public class zero extends Thread {
     private static AirVehicleState latestAirStateUAV2;
     private static AirVehicleState latestAirStateUAV3;
     private static AirVehicleState latestAirStateUAV4;
-
+    
     private static HazardZoneDetection latestHazard;
 
     private static long scenarioTime;
@@ -115,6 +116,8 @@ private static int countMissedPoints3 = 0;
     private int currSizePolygon3 = 0;
     private static Location3D lastFire = null;
     
+    //this is to check if a uav is currently going home
+    private boolean returningHome = false;
     
     int noThetas = 100;
     double xUAV1[] = new double[noThetas];
@@ -567,7 +570,7 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                 }
                 if (navCommand.get(detectingEntity - 1) == 1) {
                     //we found fire change direction CCW
-                    System.out.println("2Current dir: " + latestAirStateUAV3.getHeading() + " askedHeading: " + headingDirUAV3);
+                    //System.out.println("2Current dir: " + latestAirStateUAV3.getHeading() + " askedHeading: " + headingDirUAV3);
 
                     headingDirUAV3 = latestAirStateUAV3.getHeading();
 
@@ -628,7 +631,7 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                 }
                 if (navCommand.get(detectingEntity - 1) == 1) {
                     //we found fire change direction CCW
-                    System.out.println("2Current dir: " + latestAirStateUAV2.getHeading() + " askedHeading: " + headingDirUAV2);
+                    //System.out.println("2Current dir: " + latestAirStateUAV2.getHeading() + " askedHeading: " + headingDirUAV2);
 
                     headingDirUAV2 = latestAirStateUAV2.getHeading();
 
@@ -724,6 +727,19 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
         } else if (o instanceof afrl.cmasi.AirVehicleState) {
             AirVehicleState uav = ((AirVehicleState) o);
             //System.out.println("UAV: " + uav.getID());
+            
+            boolean batterylow = isBatteryLow(uav);
+            
+            
+            System.out.println("Batter: " + batterylow + " return: " + returningHome);
+            if(batterylow && (returningHome == false))
+            {
+                returningHome = true;
+                System.out.println("BATTERY LOWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW! GOING HOME FAM");
+            }
+            
+            
+            
 
             Location3D loc = uav.getLocation();
             //System.out.println("Lat: " + loc.getLatitude());
@@ -738,17 +754,17 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                     navCommand.set((int) uav.getID() - 1, 1);
                 }
                 if (navCommand.get((int) (uav.getID() - 1)) == 1) {
-                    System.out.println("Current dir: " + latestAirStateUAV2.getHeading() + " askedHeading: " + headingDirUAV2);
-                    System.out.println("Current time: " + scenarioTime + " elapsed: " + elapsedTImeUAV2);
+                    //System.out.println("Current dir: " + latestAirStateUAV2.getHeading() + " askedHeading: " + headingDirUAV2);
+                    //System.out.println("Current time: " + scenarioTime + " elapsed: " + elapsedTImeUAV2);
                     if (Math.abs(Math.abs(headingDirUAV2) - Math.abs(latestAirStateUAV2.getHeading())) < 10) {
                         if (scenarioTime - elapsedTImeUAV2 > 1000) {
                             headingDirUAV2 = latestAirStateUAV2.getHeading();
 
                             if (headingDirUAV2 > 0) {
-                                System.out.println("UAV: " + uav.getID() + " turning -5");
+                                //System.out.println("UAV: " + uav.getID() + " turning -5");
                                 headingDirUAV2 += 7;
                             } else {
-                                System.out.println("UAV: " + uav.getID() + " turning +5");
+                                //System.out.println("UAV: " + uav.getID() + " turning +5");
                                 headingDirUAV2 += 7;
                             }
 
@@ -780,17 +796,17 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                     navCommand.set((int) uav.getID() - 1, 1);
                 }
                 if (navCommand.get((int) (uav.getID() - 1)) == 1) {
-                    System.out.println("Current dir: " + latestAirStateUAV3.getHeading() + " askedHeading: " + headingDirUAV3);
-                    System.out.println("Current time: " + scenarioTime + " elapsed: " + elapsedTImeUAV3);
+                    //System.out.println("Current dir: " + latestAirStateUAV3.getHeading() + " askedHeading: " + headingDirUAV3);
+                    //System.out.println("Current time: " + scenarioTime + " elapsed: " + elapsedTImeUAV3);
                     if (Math.abs(Math.abs(headingDirUAV3) - Math.abs(latestAirStateUAV3.getHeading())) < 10) {
                         if (scenarioTime - elapsedTImeUAV3 > 1000) {
                             headingDirUAV3 = latestAirStateUAV3.getHeading();
 
                             if (headingDirUAV3 > 0) {
-                                System.out.println("UAV: " + uav.getID() + " turning -5");
+                                //System.out.println("UAV: " + uav.getID() + " turning -5");
                                 headingDirUAV3 += 7;
                             } else {
-                                System.out.println("UAV: " + uav.getID() + " turning +5");
+                                //System.out.println("UAV: " + uav.getID() + " turning +5");
                                 headingDirUAV3 += 7;
                             }
 
@@ -881,8 +897,23 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                     //System.out.printf("i: %d x[i] = %f, y[i] = %f theta: %f\n",i,x[i],y[i],theta[i]);
             }
     }	
+    
+        //check if the battery of the uav is low
+    public boolean isBatteryLow(AirVehicleState uav) {
+        
+       double batteryPercentage = uav.getEnergyAvailable();
+       
+       if(batteryPercentage < 90)
+       {
+           //System.out.print(batteryPercentage);
+           return true;
+       }
+       return false;
+    }
 
     public static void main(String[] args) {
         new zero().start();
     }
+
+
 }
