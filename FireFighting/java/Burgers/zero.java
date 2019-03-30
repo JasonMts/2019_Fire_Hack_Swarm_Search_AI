@@ -10,6 +10,7 @@ package Burgers;
 // ===============================================================================
 // This file was auto-created by LmcpGen. Modifications will be overwritten.
 import afrl.cmasi.AbstractGeometry;
+import afrl.cmasi.AirVehicleConfiguration;
 import afrl.cmasi.AirVehicleState;
 import afrl.cmasi.searchai.HazardZoneDetection;
 import afrl.cmasi.searchai.HazardZoneEstimateReport;
@@ -46,6 +47,8 @@ import java.util.ArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
@@ -102,7 +105,9 @@ public class zero extends Thread {
     private static long elapsedTImeUAV3 = 0;
     private static long elapsedTImeUAV2 = 0;
     private static int countMissedPoints2 = 0;
-private static int countMissedPoints3 = 0;
+    private static int countMissedPoints3 = 0;
+
+    private static List<Boolean> UAVFireAvailable = new ArrayList<>();
     private static boolean UAV2_available = true;
     private static boolean UAV3_available = true;
 
@@ -111,11 +116,10 @@ private static int countMissedPoints3 = 0;
     private int circleCounter2 = 0;
     private int circleCounter3 = 0;
     private int currSizePolygon2 = 0;
-    
+
     private int currSizePolygon3 = 0;
     private static Location3D lastFire = null;
-    
-    
+
     int noThetas = 100;
     double xUAV1[] = new double[noThetas];
     double yUAV1[] = new double[noThetas];
@@ -125,9 +129,11 @@ private static int countMissedPoints3 = 0;
     double yUAV3[] = new double[noThetas];
     double xUAV4[] = new double[noThetas];
     double yUAV4[] = new double[noThetas];
-    
-    
-    
+
+    //vehicle type 0 = fixedWing
+    //        type 1 = multi
+    List<UAV> UAVS = new ArrayList<>();
+
     Location3D refuelLoc = null;
 
     public zero() {
@@ -258,20 +264,19 @@ private static int countMissedPoints3 = 0;
 
         //Creating the list of waypoints to be sent with the mission command
         ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
-spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
-        spiralMaker(53.4750, -1.6956, xUAV2 , yUAV2,noThetas);
-        spiralMaker(53.412, -1.8335, xUAV3 , yUAV3,noThetas);
-        spiralMaker(53.412, -1.6898, xUAV4 , yUAV4,noThetas);
+        spiralMaker(53.4750, -1.8351, xUAV1, yUAV1, noThetas);
+        spiralMaker(53.4750, -1.6956, xUAV2, yUAV2, noThetas);
+        spiralMaker(53.412, -1.8335, xUAV3, yUAV3, noThetas);
+        spiralMaker(53.412, -1.6898, xUAV4, yUAV4, noThetas);
 
         int waypointnum = noThetas;
-        for(int i = 1; i < waypointnum; i++)
-        {
+        for (int i = 1; i < waypointnum; i++) {
             Waypoint waypointDev = new Waypoint();
             //System.out.print("This is waypoint " + i);
             //double randomLongitude = 0;
             //double randomLatitude = 0;
-         
-           /* if(i > 1)
+
+            /* if(i > 1)
             {
                 int decide = getRandomIntegerBetweenRange(1,4);
                 if(decide == 1)
@@ -295,31 +300,27 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
                     randomLatitude = new Random().nextDouble() * -0.04;
                 } 
             }*/
-            if(id == 1)
-            {
-                
+            if (id == 1) {
+
                 waypointDev.setLatitude(xUAV1[i]);
                 waypointDev.setLongitude(yUAV1[i]);
                 waypointDev.setAltitude(1000);
-                
+
             }
-            if(id == 2)
-            {
-                
+            if (id == 2) {
+
                 waypointDev.setLatitude(xUAV2[i]);
                 waypointDev.setLongitude(yUAV2[i]);
                 waypointDev.setAltitude(1000);
             }
-            if(id == 3)
-            {
-                
+            if (id == 3) {
+
                 waypointDev.setLatitude(xUAV3[i]);
                 waypointDev.setLongitude(yUAV3[i]);
                 waypointDev.setAltitude(1000);
             }
-            if(id == 4)
-            {
-                
+            if (id == 4) {
+
                 waypointDev.setLatitude(xUAV4[i]);
                 waypointDev.setLongitude(yUAV4[i]);
                 waypointDev.setAltitude(1000);
@@ -540,184 +541,25 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
         if (o instanceof afrl.cmasi.searchai.HazardZoneDetection) {
 
             HazardZoneDetection hazardDetected = ((HazardZoneDetection) o);
-            latestHazard = hazardDetected;
+
             //Get location where zone first detected
             Location3D detectedLocation = hazardDetected.getDetectedLocation();
-            System.out.println("LAT: " + detectedLocation.getLatitude());
-            System.out.println("LOG: " + detectedLocation.getLongitude());
+            //System.out.println("LAT: " + detectedLocation.getLatitude());
+            // System.out.println("LOG: " + detectedLocation.getLongitude());
 
             wayPointList.add(detectedLocation.getLatitude());
             wayPointList.add(detectedLocation.getLongitude());
             int detectingEntity = (int) hazardDetected.getDetectingEnitiyID();
+            UAV curUAV = null;
+            if (detectingEntity != 0) {
+                curUAV = UAVS.get(detectingEntity - 1);
 
-            if (detectingEntity == 3) {
-                UAV3_available = false;
-                System.out.println("Uav " + detectingEntity + " found fire!!!");
-                System.out.println("PointCount " + countMissedPoints3 );
-                if (gimbalCommand.get(detectingEntity - 1) == 0) {
+            }
 
-                    //Add point to polygon and send the report
-                    estimatedHazardZoneUAV1.getBoundaryPoints().add(detectedLocation);
-                    sendEstimateReport(out, estimatedHazardZoneUAV1, 1);
-
-                    System.out.println("Rotating Camera");
-                    sendSensorCommand(out, detectingEntity);
-                    gimbalCommand.set((detectingEntity - 1), 1);
-                    countMissedPoints3++;
-                }
-                if (navCommand.get(detectingEntity - 1) == 1) {
-                    //we found fire change direction CCW
-                    System.out.println("2Current dir: " + latestAirStateUAV3.getHeading() + " askedHeading: " + headingDirUAV3);
-
-                    headingDirUAV3 = latestAirStateUAV3.getHeading();
-
-                    System.out.println("UAV: " + detectingEntity + " turning -12");
-                    headingDirUAV3 -= 12;
-                    //increment counter if points == 10 add current point to polygon
-                    countMissedPoints3++;
-                    if (countMissedPoints3 == 10) {
-                        Location3D hazLoc = estimatedHazardZoneUAV1.getBoundaryPoints().get(0);
-                         double distance = Math.sqrt(Math.pow((detectedLocation.getLongitude() - hazLoc.getLongitude()),2) + Math.pow((detectedLocation.getLatitude() - hazLoc.getLatitude()),2));
-                        if (distance < 0.01 && currSizePolygon3 > 5 ) {    
-                            circleFire3 = true;
-                            circleCounter3 = 0;
-                        }
-                      
-                        if(circleCounter3 >= currSizePolygon3 && circleCounter3 != 0){
-                            System.out.println("New points");
-                            circleFire3 = false;
-                            
-                        }
-                        if (circleFire3 ) {
-                            System.out.println("Counter3: " + circleCounter3 + " size: " + currSizePolygon3 );
-                            estimatedHazardZoneUAV1.getBoundaryPoints().set(circleCounter3, detectedLocation);
-                            circleCounter3++;
-                        } else {
-                            System.out.println("Add point UAV1");
-                            estimatedHazardZoneUAV1.getBoundaryPoints().add(detectedLocation);
-                            currSizePolygon3++;
-                        }
-                       
-                        sendEstimateReport(out, estimatedHazardZoneUAV1, 1);
-                        countMissedPoints3 = 0;
-                    }
-                    //send command to change direction
-                    FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, headingDirUAV3, latestAirStateUAV3.getLocation().getAltitude(), AltitudeType.MSL, 0);
-                    sendNavigationCommand(out, (int) detectingEntity, dir);
-                    if (headingDirUAV3 <= -180) {
-                        headingDirUAV3 += 360;
-                    }
-
-                    navCommand.set((detectingEntity - 1), 1);
-                }
-//                    
-            } else if (detectingEntity == 2) {
-                UAV2_available = false;
-                System.out.println("Uav " + detectingEntity + " found fire!!!");
-                System.out.println("PointCount " + countMissedPoints2 );
-                if (gimbalCommand.get(detectingEntity - 1) == 0) {
-
-                    //Add point to polygon and send the report
-                    estimatedHazardZoneUAV2.getBoundaryPoints().add(detectedLocation);
-                    sendEstimateReport(out, estimatedHazardZoneUAV2, 2);
-
-                    System.out.println("Rotating Camera");
-                    sendSensorCommand(out, detectingEntity);
-                    gimbalCommand.set((detectingEntity - 1), 1);
-                    countMissedPoints2++;
-                }
-                if (navCommand.get(detectingEntity - 1) == 1) {
-                    //we found fire change direction CCW
-                    System.out.println("2Current dir: " + latestAirStateUAV2.getHeading() + " askedHeading: " + headingDirUAV2);
-
-                    headingDirUAV2 = latestAirStateUAV2.getHeading();
-
-                    System.out.println("UAV: " + detectingEntity + " turning -12");
-                    headingDirUAV2 -= 12;
-                    //increment counter if points == 10 add current point to polygon
-                    countMissedPoints2++;
-                    if (countMissedPoints2 == 10) {
-                        System.out.println("Add point UAV2");
-                        Location3D hazLoc = estimatedHazardZoneUAV2.getBoundaryPoints().get(0);
-                        double distance = Math.sqrt(Math.pow((detectedLocation.getLongitude() - hazLoc.getLongitude()),2) + Math.pow((detectedLocation.getLatitude() - hazLoc.getLatitude()),2));
-                        if (distance < 0.01 && currSizePolygon2 > 5) {
-                            circleFire2 = true;
-                            circleCounter2 = 0;
-                        }
-                        if(circleCounter2 >= currSizePolygon2 && circleCounter2 != 0){
-                            System.out.println("New points");
-                            circleFire2 = false;
-                            
-                            
-                        }
-                        if (circleFire2 ) {
-                            System.out.println("Counter2: " + circleCounter2 + " size: " + currSizePolygon2);
-                            estimatedHazardZoneUAV2.getBoundaryPoints().set(circleCounter2, detectedLocation);
-                            circleCounter2++;
-                        } else {
-                            estimatedHazardZoneUAV2.getBoundaryPoints().add(detectedLocation);
-                            currSizePolygon2++;
-                        }
-
-                        sendEstimateReport(out, estimatedHazardZoneUAV2, 2);
-                        countMissedPoints2 = 0;
-                    }
-                    //send command to change direction
-                    FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, headingDirUAV2, latestAirStateUAV2.getLocation().getAltitude(), AltitudeType.MSL, 0);
-                    sendNavigationCommand(out, (int) detectingEntity, dir);
-                    if (headingDirUAV2 <= -180) {
-                        headingDirUAV2 += 360;
-                    }
-
-                    navCommand.set((detectingEntity - 1), 1);
-                }
-
-            } else if (detectingEntity == 1) {
-                boolean goInside = false;
-                if (lastFire != null) {
-                    double latDiff = Math.abs(lastFire.getLatitude() - detectedLocation.getLatitude());
-                    double lonDiff = Math.abs(lastFire.getLongitude() - detectedLocation.getLongitude());
-                    if (latDiff > 0.01 || lonDiff > 0.01) {
-                        goInside = true;
-                    }
-                } else {
-                    goInside = true;
-                }
-                if (goInside) {
-                    if (UAV2_available == true) {
-                        goToFire(out, 2, detectedLocation);
-                        UAV2_available = false;
-                    } else if (UAV3_available == true) {
-                        goToFire(out, 3, detectedLocation);
-                        UAV3_available = false;
-                    } else {
-                        System.out.println("No available drones");
-                    }
-                }
-                lastFire = detectedLocation;
-            } else if (detectingEntity == 4) {
-                boolean goInside = false;
-                if (lastFire != null) {
-                    double latDiff = Math.abs(lastFire.getLatitude() - detectedLocation.getLatitude());
-                    double lonDiff = Math.abs(lastFire.getLongitude() - detectedLocation.getLongitude());
-                    if (latDiff > 0.01 || lonDiff > 0.01) {
-                        goInside = true;
-                    }
-                } else {
-                    goInside = true;
-                }
-                if (goInside) {
-                    if (UAV3_available == true) {
-                        goToFire(out, 3, detectedLocation);
-                        UAV3_available = false;
-                    } else if (UAV2_available == true) {
-                        goToFire(out, 2, detectedLocation);
-                        UAV2_available = false;
-                    } else {
-                        System.out.println("No available drones");
-                    }
-                }
-                lastFire = detectedLocation;
+            if (curUAV.isFixedWing()) {
+                callForFireMapping(out, curUAV, detectedLocation);
+            } else if (curUAV.isMulti()) {
+                circleFire(out, curUAV, detectedLocation);
             }
 
 //           
@@ -725,101 +567,25 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
             AirVehicleState uav = ((AirVehicleState) o);
             //System.out.println("UAV: " + uav.getID());
 
-            Location3D loc = uav.getLocation();
-            //System.out.println("Lat: " + loc.getLatitude());
-
-            if (uav.getID() == 2) {
-                latestAirStateUAV2 = uav;
-                if (gimbalCommand.get((int) uav.getID() - 1) == 1 && navCommand.get((int) uav.getID() - 1) == 0) {
-                    System.out.println("Change direction for UAV : " + uav.getID());
-                    headingDirUAV2 = uav.getHeading() - 90;
-                    FlightDirectorAction dir = new FlightDirectorAction(uav.getAirspeed(), SpeedType.Groundspeed, headingDirUAV2, uav.getLocation().getAltitude(), AltitudeType.MSL, 0);
-                    sendNavigationCommand(out, (int) uav.getID(), dir);
-                    navCommand.set((int) uav.getID() - 1, 1);
-                }
-                if (navCommand.get((int) (uav.getID() - 1)) == 1) {
-                    System.out.println("Current dir: " + latestAirStateUAV2.getHeading() + " askedHeading: " + headingDirUAV2);
-                    System.out.println("Current time: " + scenarioTime + " elapsed: " + elapsedTImeUAV2);
-                    if (Math.abs(Math.abs(headingDirUAV2) - Math.abs(latestAirStateUAV2.getHeading())) < 10) {
-                        if (scenarioTime - elapsedTImeUAV2 > 1000) {
-                            headingDirUAV2 = latestAirStateUAV2.getHeading();
-
-                            if (headingDirUAV2 > 0) {
-                                System.out.println("UAV: " + uav.getID() + " turning -5");
-                                headingDirUAV2 += 7;
-                            } else {
-                                System.out.println("UAV: " + uav.getID() + " turning +5");
-                                headingDirUAV2 += 7;
-                            }
-
-                            FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, headingDirUAV2, latestAirStateUAV2.getLocation().getAltitude(), AltitudeType.MSL, 0);
-                            sendNavigationCommand(out, (int) (uav.getID()), dir);
-                            navCommand.set(((int) (uav.getID() - 1)), 1);
-                            if (headingDirUAV2 > 180) {
-                                headingDirUAV2 -= 360;
-                            }
-                            elapsedTImeUAV2 = scenarioTime;
-                        } else {
-                            System.out.println("Delay UAV: " + uav.getID());
-                        }
-                    }
-                }
-
-                GimbalState gimbal = (GimbalState) uav.getPayloadStateList().get(0);
-                CameraState camera = (CameraState) uav.getPayloadStateList().get(1);
-
-                // System.out.println("Gimbal Rot:" + gimbal.getRotation());
-                // System.out.println("Camera Rot:" + camera.getRotation());
-            } else if (uav.getID() == 3) {
-                latestAirStateUAV3 = uav;
-                if (gimbalCommand.get((int) uav.getID() - 1) == 1 && navCommand.get((int) uav.getID() - 1) == 0) {
-                    System.out.println("Change direction for UAV : " + uav.getID());
-                    headingDirUAV3 = uav.getHeading() - 90;
-                    FlightDirectorAction dir = new FlightDirectorAction(uav.getAirspeed(), SpeedType.Groundspeed, headingDirUAV3, uav.getLocation().getAltitude(), AltitudeType.MSL, 0);
-                    sendNavigationCommand(out, (int) uav.getID(), dir);
-                    navCommand.set((int) uav.getID() - 1, 1);
-                }
-                if (navCommand.get((int) (uav.getID() - 1)) == 1) {
-                    System.out.println("Current dir: " + latestAirStateUAV3.getHeading() + " askedHeading: " + headingDirUAV3);
-                    System.out.println("Current time: " + scenarioTime + " elapsed: " + elapsedTImeUAV3);
-                    if (Math.abs(Math.abs(headingDirUAV3) - Math.abs(latestAirStateUAV3.getHeading())) < 10) {
-                        if (scenarioTime - elapsedTImeUAV3 > 1000) {
-                            headingDirUAV3 = latestAirStateUAV3.getHeading();
-
-                            if (headingDirUAV3 > 0) {
-                                System.out.println("UAV: " + uav.getID() + " turning -5");
-                                headingDirUAV3 += 7;
-                            } else {
-                                System.out.println("UAV: " + uav.getID() + " turning +5");
-                                headingDirUAV3 += 7;
-                            }
-
-                            FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, headingDirUAV3, latestAirStateUAV3.getLocation().getAltitude(), AltitudeType.MSL, 0);
-                            sendNavigationCommand(out, (int) (uav.getID()), dir);
-                            navCommand.set(((int) (uav.getID() - 1)), 1);
-                            if (headingDirUAV3 > 180) {
-                                headingDirUAV3 -= 360;
-                            }
-                            elapsedTImeUAV3 = scenarioTime;
-                        } else {
-                            System.out.println("Delay UAV: " + uav.getID());
-                        }
-                    }
-                }
-
+            //Location3D loc = uav.getLocation();
+            if (scenarioTime > 10) {
+                turnAwayFromFire(out, uav);
             }
 
+            //System.out.println("Lat: " + loc.getLatitude());
         } else if (o instanceof afrl.cmasi.SessionStatus) {
             //Example of using an incoming LMCP message
             scenarioTime = ((SessionStatus) o).getScenarioTime();
             //System.out.println(o.toString());
-        }else if (o instanceof afrl.cmasi.searchai.RecoveryPoint) {
+        } else if (o instanceof afrl.cmasi.searchai.RecoveryPoint) {
             RecoveryPoint recovery = (RecoveryPoint) o;
             Circle boundary = (Circle) recovery.getBoundary();
-            
-            refuelLoc =  boundary.getCenterPoint();
+
+            refuelLoc = boundary.getCenterPoint();
             refuelLoc.setAltitude(700);
             //System.out.println(refuelLoc.toString());
+        } else if (o instanceof afrl.cmasi.AirVehicleConfiguration) {
+            newDrone((AirVehicleConfiguration) o);
         }
     }
 
@@ -833,6 +599,167 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
      * @param port
      * @return
      */
+    private void newDrone(AirVehicleConfiguration o) {
+        AirVehicleConfiguration uavState = (AirVehicleConfiguration) o;
+        //System.out.println(uavState.getEntityType());
+        if (uavState.getEntityType().equals("FixedWing")) {
+            System.out.println("Hi am FixedWing with id: " + uavState.getID());
+            UAVS.add(new UAV(0, true, (int) uavState.getID()));
+        } else {
+            UAVS.add(new UAV(1, true, (int) uavState.getID()));
+            System.out.println("Hi am Multi with id: " + uavState.getID());
+        }
+        sortList(UAVS);
+//        for(UAV uav : UAVS){
+//            System.out.println(uav.getId());
+//        }
+    }
+
+    private void sortList(List<UAV> list) {
+        Collections.sort(list, new Comparator<UAV>() {
+            public int compare(UAV ideaVal1, UAV ideaVal2) {
+                // avoiding NullPointerException in case name is null
+                Integer idea1 = new Integer(ideaVal1.getId());
+                Integer idea2 = new Integer(ideaVal2.getId());
+                return idea1.compareTo(idea2);
+            }
+        });
+    }
+
+    private void callForFireMapping(OutputStream out, UAV curUAV, Location3D detectedLocation) throws Exception {
+
+        boolean goInside = false;
+        if (curUAV.getLastFire() != null) {
+            double latDiff = Math.abs(curUAV.getLastFire().getLatitude() - detectedLocation.getLatitude());
+            double lonDiff = Math.abs(curUAV.getLastFire().getLongitude() - detectedLocation.getLongitude());
+            if (latDiff > 0.01 || lonDiff > 0.01) {
+                goInside = true;
+            }
+        } else {
+            goInside = true;
+        }
+        if (goInside) {
+            for (UAV uav : UAVS) {
+                if (uav.isAvailable()) {
+                    goToFire(out, uav.getId(), detectedLocation);
+                    uav.setAvailable(false);
+
+                }
+            }
+
+        }
+        curUAV.setLastFire(detectedLocation);
+        UAVS.set(curUAV.getId() - 1, curUAV);
+
+    }
+
+    private void circleFire(OutputStream out, UAV curUAV, Location3D detectedLocation) throws Exception {
+
+        curUAV.setAvailable(false);
+        System.out.println("Uav " + curUAV.getId() + " found fire!!!");
+        System.out.println("PointCount " + curUAV.getCountMissedPoints());
+        if (curUAV.isGimbalChanged() == false) {
+
+            //Add point to polygon and send the report
+            curUAV.getEstimateHazardZone().getBoundaryPoints().add(detectedLocation);
+            sendEstimateReport(out, curUAV.getEstimateHazardZone(), curUAV.getId());
+
+            System.out.println("Rotating Camera");
+            sendSensorCommand(out, curUAV.getId());
+            curUAV.setGimbalChanged(true);
+            curUAV.incrementCountMissedPoints();
+        }
+        if (curUAV.isNavCommand()) {
+            //we found fire change direction CCW
+            System.out.println("2Current dir: " + curUAV.getLastAirstate().getHeading() + " askedHeading: " + curUAV.getHeadingDir());
+
+            curUAV.setHeadingDir(curUAV.getLastAirstate().getHeading());
+
+            System.out.println("UAV: " + curUAV.getId() + " turning -12");
+            curUAV.setHeadingDir(curUAV.getLastAirstate().getHeading() - 12);
+            //increment counter if points == 10 add current point to polygon
+            curUAV.incrementCountMissedPoints();
+            if (curUAV.getCountMissedPoints() == 10) {
+                Location3D hazLoc = curUAV.getEstimateHazardZone().getBoundaryPoints().get(0);
+                double distance = Math.sqrt(Math.pow((detectedLocation.getLongitude() - hazLoc.getLongitude()), 2) + Math.pow((detectedLocation.getLatitude() - hazLoc.getLatitude()), 2));
+                if (distance < 0.01 && curUAV.getCurrSizePolygon() > 5) {
+                    curUAV.setCircleFire(true);
+                    curUAV.setCircleCounter(0);
+                }
+
+                if (curUAV.getCircleCounter() >= curUAV.getCurrSizePolygon() && curUAV.getCircleCounter() != 0) {
+                    System.out.println("New points");
+                    curUAV.setCircleFire(false);
+
+                }
+                if (curUAV.isCircleFire()) {
+                    System.out.println("Counter3: " + curUAV.getCircleCounter() + " size: " + curUAV.getCurrSizePolygon());
+                    curUAV.getEstimateHazardZone().getBoundaryPoints().set(curUAV.getCircleCounter(), detectedLocation);
+                    curUAV.incrementCircleCounter();
+                } else {
+                    System.out.println("Add point UAV1");
+                    curUAV.getEstimateHazardZone().getBoundaryPoints().add(detectedLocation);
+                    curUAV.incrementPolygonSize();
+                }
+
+                sendEstimateReport(out, curUAV.getEstimateHazardZone(), curUAV.getId());
+                curUAV.setCountMissedPoints(0);
+            }
+            //send command to change direction
+            FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, curUAV.getHeadingDir(), curUAV.getLastAirstate().getLocation().getAltitude(), AltitudeType.MSL, 0);
+            sendNavigationCommand(out, (int) curUAV.getId(), dir);
+            if (curUAV.getHeadingDir() <= -180) {
+                curUAV.setHeadingDir(curUAV.getHeadingDir() + 360);
+            }
+            curUAV.setNavCommand(true);
+
+        }
+//                    
+
+        UAVS.set((curUAV.getId() - 1), curUAV);
+    }
+
+    private void turnAwayFromFire(OutputStream out, AirVehicleState uav) throws Exception {
+        UAV curUAV = UAVS.get(((int) uav.getID() - 1));
+        curUAV.setLastAirstate(uav);
+        if (curUAV.isGimbalChanged() && curUAV.isNavCommand() == false) {
+            System.out.println("Change direction for UAV : " + uav.getID());
+            curUAV.setHeadingDir(uav.getHeading() - 90);
+            FlightDirectorAction dir = new FlightDirectorAction(uav.getAirspeed(), SpeedType.Groundspeed, curUAV.getHeadingDir(), uav.getLocation().getAltitude(), AltitudeType.MSL, 0);
+            sendNavigationCommand(out, (int) uav.getID(), dir);
+            curUAV.setNavCommand(true);
+        }
+        if (curUAV.isNavCommand()) {
+            System.out.println("Current dir: " + curUAV.getLastAirstate().getHeading() + " askedHeading: " + curUAV.getHeadingDir());
+            System.out.println("Current time: " + scenarioTime + " elapsed: " + curUAV.getElapsedTime());
+            if (Math.abs(Math.abs(curUAV.getHeadingDir()) - Math.abs(curUAV.getLastAirstate().getHeading())) < 10) {
+                if (scenarioTime - curUAV.getElapsedTime() > 1000) {
+                    curUAV.setHeadingDir(curUAV.getLastAirstate().getHeading());
+
+                    System.out.println("UAV: " + uav.getID() + " turning +7");
+                    curUAV.setHeadingDir(curUAV.getHeadingDir() + 7);
+
+                    FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, curUAV.getHeadingDir(), curUAV.getLastAirstate().getLocation().getAltitude(), AltitudeType.MSL, 0);
+                    sendNavigationCommand(out, (int) (uav.getID()), dir);
+                    curUAV.setNavCommand(true);
+                    if (curUAV.getHeadingDir() > 180) {
+                        curUAV.setHeadingDir(curUAV.getHeadingDir() - 360);
+                    }
+                    curUAV.setElapsedTime(scenarioTime);
+                } else {
+                    System.out.println("Delay UAV: " + uav.getID());
+                }
+            }
+        }
+        UAVS.set(curUAV.getId() - 1, curUAV);
+
+//            GimbalState gimbal = (GimbalState) uav.getPayloadStateList().get(0);
+//            CameraState camera = (CameraState) uav.getPayloadStateList().get(1);
+//
+//            // System.out.println("Gimbal Rot:" + gimbal.getRotation());
+//            // System.out.println("Camera Rot:" + camera.getRotation());
+    }
+
     public Socket connect(String host, int port) {
         Socket socket = null;
         try {
@@ -859,28 +786,29 @@ spiralMaker(53.4750, -1.8351, xUAV1 , yUAV1,noThetas);
         int x = (int) (Math.random() * ((max - min) + 1)) + min;
         return x;
     }
-    public static void spiralMaker(double myLong, double myLat,double x[] ,double y[], int noThetas) {
-            double theta[] = new double[noThetas];
-            
-            double b = 0.0018;
-            double a = 0.019;
 
-            double inc =  720/noThetas;
-            for (int i = 0; i< noThetas; i++){
-                theta[i] = 0;
-            }
-            for (int i = 0; i< noThetas; i++){
-                theta[i] = i*inc;
-            }
-                        
-            for (int i = 0; i< noThetas; i++) {
+    public static void spiralMaker(double myLong, double myLat, double x[], double y[], int noThetas) {
+        double theta[] = new double[noThetas];
 
-                    x[i]  = myLong + a*Math.exp(b*theta[i])*Math.cos(Math.toRadians(theta[i]));
-                    y[i]  = myLat + a*Math.exp(b*theta[i])*Math.sin(Math.toRadians(theta[i]));
-                    // print the values
-                    //System.out.printf("i: %d x[i] = %f, y[i] = %f theta: %f\n",i,x[i],y[i],theta[i]);
-            }
-    }	
+        double b = 0.0018;
+        double a = 0.019;
+
+        double inc = 720 / noThetas;
+        for (int i = 0; i < noThetas; i++) {
+            theta[i] = 0;
+        }
+        for (int i = 0; i < noThetas; i++) {
+            theta[i] = i * inc;
+        }
+
+        for (int i = 0; i < noThetas; i++) {
+
+            x[i] = myLong + a * Math.exp(b * theta[i]) * Math.cos(Math.toRadians(theta[i]));
+            y[i] = myLat + a * Math.exp(b * theta[i]) * Math.sin(Math.toRadians(theta[i]));
+            // print the values
+            //System.out.printf("i: %d x[i] = %f, y[i] = %f theta: %f\n",i,x[i],y[i],theta[i]);
+        }
+    }
 
     public static void main(String[] args) {
         new zero().start();
