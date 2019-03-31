@@ -238,8 +238,8 @@ public class UAV {
         this.follower = i;
     }
     
-    public int getFollower(int i){
-        return this.follower = i;
+    public int getFollower(){
+        return this.follower ;
     }
 
     

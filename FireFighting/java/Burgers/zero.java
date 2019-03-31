@@ -55,7 +55,6 @@ import java.util.List;
 import java.util.Random;
 import afrl.cmasi.FollowPathCommand;
 
-
 /**
  * Connects to the simulation and sends a fake mission command to every UAV that
  * is requested in the plan request.
@@ -105,6 +104,8 @@ public class zero extends Thread {
     private static AirVehicleState latestAirStateUAV3;
     private static AirVehicleState latestAirStateUAV4;
 
+    private List<Integer> follower = new ArrayList<>();
+
     private static HazardZoneDetection latestHazard;
 
     private static long scenarioTime;
@@ -140,7 +141,7 @@ public class zero extends Thread {
     double yUAV4[] = new double[noThetas];
     double xUAV5[] = new double[noThetas];
     double yUAV5[] = new double[noThetas];
-    
+
     private int countSpiral = 0;
 
     //vehicle type 0 = fixedWing
@@ -149,13 +150,17 @@ public class zero extends Thread {
 
     Location3D refuelLoc = null;
 
+    private static boolean setup = false;
+
     public zero() {
     }
 
     @Override
     public void run() {
         try {
-
+//            for(int i=0;i<4;i++){
+//                follower[i] = false;
+//            }
             // connect to the server
             Socket socket = connect(host, port);
             boolean missionCommand = false;
@@ -201,34 +206,35 @@ public class zero extends Thread {
                         tempLat = rec.getCenterPoint().getLatitude() - (rec.getHeight() / 110574) / 4;
                         tempLon = rec.getCenterPoint().getLongitude() - (rec.getWidth() / 111320 * Math.cos(tempLat * (Math.PI / 180))) / 2;
                         spiralMaker(tempLat, tempLon, xUAV5, yUAV5, noThetas);
-                        if(countSpiral <5){
+                        if (countSpiral < 5) {
                             for (UAV uav : UAVS) {
-                                if ((uav.isFixedWing() || countSpiral ==3) && !uav.isMission()) {
+                                if ((uav.isFixedWing() || countSpiral == 3) && !uav.isMission()) {
                                     sendMissionCommand(socket.getOutputStream(), uav.getId());
                                     uav.setMission(true);
                                 }
                             }
-                        }else{
-                             missionCommand = true;
+                        } else {
+                            missionCommand = true;
                         }
                     }
                     //sendMissionCommand(out,2,detectedLocation);
                 }
-                if((scenarioTime - last_time > 100000 ) && (scenarioTime > 10000)){
+                if ((scenarioTime - last_time > 100000) && (scenarioTime > 10000)) {
                     last_time = scenarioTime;
                     for (UAV uav : UAVS) {
-                        if (!uav.isFixedWing() && uav.isAvailable() && !uav.isMission() && uav.patrol == false ){
-                              followFixedUavCmd(socket.getOutputStream(), uav.getId());
-                              //uav.setMission(true);
-                          }
-                        if (uav.patrol == true){
+                        if (!uav.isFixedWing() && uav.isAvailable() && !uav.isMission() && uav.patrol == false) {
+                            followFixedUavCmd(socket.getOutputStream(), uav.getId());
+                            //uav.setMission(true);
+                        }
+                        if (uav.patrol == true) {
                             sendMissionCommandWaypoints(socket.getOutputStream(), uav.getId(), uav.waypointList);
 
                         }
                     }
-               
+                     setup = true;
+
                 }
-                
+
             }
 
         } catch (Exception ex) {
@@ -248,7 +254,6 @@ public class zero extends Thread {
         //VehicleActionCommand repeat = new VehicleActionCommand();
         //repeat.
         //o.
-        
         o.setFirstWaypoint(1);
         //Setting the UAV to recieve the mission
         o.setVehicleID(id);
@@ -333,8 +338,8 @@ public class zero extends Thread {
         wayPointListCount += 2;
         countSpiral++;
     }
-    
-    public void sendMissionCommandWaypoints(OutputStream out, int id, ArrayList<Waypoint> waypoints ) throws Exception {
+
+    public void sendMissionCommandWaypoints(OutputStream out, int id, ArrayList<Waypoint> waypoints) throws Exception {
         //Setting up the mission to send to the UAV
 
         //We will now have 4 missions
@@ -346,7 +351,6 @@ public class zero extends Thread {
         //VehicleActionCommand repeat = new VehicleActionCommand();
         //repeat.
         //o.
-        
         o.setFirstWaypoint(1);
         //Setting the UAV to recieve the mission
         o.setVehicleID(id);
@@ -370,10 +374,9 @@ public class zero extends Thread {
 
         //We will now have 4 missions
         //ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
-
         //one for each drone
         MissionCommand o = new MissionCommand();
-        
+
         o.setFirstWaypoint(1);
         //Setting the UAV to recieve the mission
         o.setVehicleID(id);
@@ -386,7 +389,7 @@ public class zero extends Thread {
         ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
 
         int waypointnum = noThetas;
-        
+
         Waypoint waypointDev = new Waypoint();
 
         waypointDev.setAltitude(700);
@@ -396,56 +399,73 @@ public class zero extends Thread {
 
         // get current UAV
         //UAV currUAV = UAVS.get(id-1);
-        
-        for (int i=0; i < UAVS.size();i++){
-            
-            if (UAVS.get(i).isFixedWing() ){
-                
-                if (!UAVS.get(i).isGotFollower()) {
+        for (int i = 0; i < UAVS.size(); i++) {
+            boolean flag = false;
+            if (UAVS.get(i).isFixedWing()) {
+                if (setup == false) {
+                    for (Integer f : follower) {
+                        if (f == UAVS.get(i).getId()) {
+                            flag = true;
+                            break;
+                        }
+                    }
+
+                    if (flag) {
+                        continue;
+                    }
+                }
+
+                if (!UAVS.get(i).isGotFollower() && setup == false) {
                     waypointDev.setLatitude(UAVS.get(i).getLastAirstate().getLocation().getLatitude());
                     waypointDev.setLongitude(UAVS.get(i).getLastAirstate().getLocation().getLongitude());
                     waypointDev.setAltitude(1000);
-                
-                    UAVS.get(i).setFollower(i);
-                    UAVS.get(i).setGotFollower(true);
-                    System.out.printf("fhfhf");
+
+                    UAVS.get(id-1).setFollower(i);
+                    UAVS.get(id-1).setGotFollower(true);
+                    follower.add(UAVS.get(i).getId());
+                    //System.out.println("fhfhf");
                     break;
-                }
-                else if ( i == UAVS.get(i).getFollower(i) ){
+                } else if (i == UAVS.get(id-1).getFollower()) {
                     waypointDev.setLatitude(UAVS.get(i).getLastAirstate().getLocation().getLatitude());
                     waypointDev.setLongitude(UAVS.get(i).getLastAirstate().getLocation().getLongitude());
                     waypointDev.setAltitude(1000);
-                    System.out.printf("FOLLOW ALREADY");
+                    //System.out.println("Follow " + i);
                     break;
                 }
-            } 
+            }
+
         }
-        
+       
+
         //Setting speed to reach the waypoint
-        waypointDev.setSpeed(100);
+        waypointDev.setSpeed(
+                100);
         waypointDev.setSpeedType(SpeedType.Airspeed);
 
         //Setting the climb rate to reach new altitude (if applicable)
-        waypointDev.setClimbRate(100);
+        waypointDev.setClimbRate(
+                100);
         waypointDev.setTurnType(TurnType.TurnShort);
         //Setting backup waypoints if new waypoint can't be reached
-        waypointDev.setContingencyWaypointA(0);
-        waypointDev.setContingencyWaypointB(0);
+
+        waypointDev.setContingencyWaypointA(
+                0);
+        waypointDev.setContingencyWaypointB(
+                0);
 
         waypoints.add(waypointDev);
-        
 
         //Setting the waypoint list in the mission command
-        o.getWaypointList().addAll(waypoints);
+        o.getWaypointList()
+                .addAll(waypoints);
 
         //Sending the Mission Command message to AMASE to be interpreted
         out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
         //wayPointNumber++;
         //wayPointListCount += 2;
         //countSpiral++;
-}
-    
-    
+    }
+
     public void goToFire(OutputStream out, int id, Location3D loc) throws Exception {
         //Setting up the mission to send to the UAV
 
@@ -642,13 +662,13 @@ public class zero extends Thread {
 
             if (curUAV.isFixedWing()) {
                 callForFireMapping(out, curUAV, detectedLocation);
-            } else if (curUAV.isMulti()  && !curUAV.patrol) {
+            } else if (curUAV.isMulti() && !curUAV.patrol) {
                 circleFire(out, curUAV, detectedLocation);
             }
 
 //           
         } else if (o instanceof afrl.cmasi.AirVehicleState) {
-            
+
             AirVehicleState uav = ((AirVehicleState) o);
             //System.out.println("UAV: " + uav.getID());
             windSpeed_ = uav.getWindSpeed();
@@ -663,7 +683,7 @@ public class zero extends Thread {
                 System.out.println("BATTERY LOWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW! GOING HOME FAM");
                 missionRecharge(out, uav.getID(), refuelLoc);
             }
-            if (scenarioTime > 10 && !UAVS.get((int)uav.getID()-1).patrol) {
+            if (scenarioTime > 10 && !UAVS.get((int) uav.getID() - 1).patrol) {
                 turnAwayFromFire(out, uav);
             }
 
@@ -787,9 +807,9 @@ public class zero extends Thread {
 
                     //ArrayList<Waypoint> waypointList = new ArrayList<Waypoint>();
                     getHotSpotPoints(curUAV.getEstimateHazardZone(), curUAV.waypointList);
-                    
+
                     curUAV.patrol = true;
-                    sendMissionCommandWaypoints(out, curUAV.getId(),curUAV.waypointList);
+                    sendMissionCommandWaypoints(out, curUAV.getId(), curUAV.waypointList);
                     //sendMissionCommandWaypoints(out, curUAV.getId(),waypointList);
                     //sendMissionCommandWaypoints(out, curUAV.getId(),waypointList);
                     //sendMissionCommandWaypoints(out, curUAV.getId(),waypointList);
