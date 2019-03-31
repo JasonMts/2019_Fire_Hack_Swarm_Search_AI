@@ -217,11 +217,11 @@ public class zero extends Thread {
                 if((scenarioTime - last_time > 100000 ) && (scenarioTime > 10000)){
                     last_time = scenarioTime;
                     for (UAV uav : UAVS) {
-                        if (!uav.isFixedWing() && uav.isAvailable() && !uav.isMission() && uav.patrol == false ){
+                        if (!uav.isFixedWing() && uav.isAvailable() && !uav.isMission() && uav.patrol == false && uav.isReturningHome() == false){
                               followFixedUavCmd(socket.getOutputStream(), uav.getId());
                               //uav.setMission(true);
                           }
-                        if (uav.patrol == true){
+                        if (uav.patrol == true && uav.isReturningHome() == false){
                             sendMissionCommandWaypoints(socket.getOutputStream(), uav.getId(), uav.waypointList);
 
                         }
@@ -642,7 +642,7 @@ public class zero extends Thread {
 
             if (curUAV.isFixedWing()) {
                 callForFireMapping(out, curUAV, detectedLocation);
-            } else if (curUAV.isMulti()  && !curUAV.patrol) {
+            } else if (curUAV.isMulti()  && !curUAV.patrol && curUAV.isReturningHome() == false) {
                 circleFire(out, curUAV, detectedLocation);
             }
 
@@ -655,15 +655,35 @@ public class zero extends Thread {
             windDirection_ = uav.getWindDirection();
 
             boolean batterylow = isBatteryLow(uav);
+            UAV currentUAV = UAVS.get((int)(uav.getID() - 1));
+            
+            //if it goes home recharge it will return to this afterwards
 
+             Location3D lastposition = new Location3D();
+             lastposition.setLatitude(53);
+             lastposition.setLongitude(3);
+             lastposition.setAltitude(700);
+             
+                     
             //System.out.println("Batter: " + batterylow + " return: " + returningHome);
             //System.out.println("Batter: " + batterylow + " return: " + returningHome);
-            if (batterylow && (returningHome == false)) {
-                returningHome = true;
+            if (batterylow && currentUAV.isReturningHome() == false) {
+                currentUAV.setReturningHome(true);
                 System.out.println("BATTERY LOWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW! GOING HOME FAM");
                 missionRecharge(out, uav.getID(), refuelLoc);
             }
-            if (scenarioTime > 10 && !UAVS.get((int)uav.getID()-1).patrol) {
+            if (currentUAV.isReturningHome() && isBatteryHigh(uav))
+            {
+                lastposition = UAVS.get((int)(uav.getID() - 1)).getLastAirstate().getLocation();
+                currentUAV.setReturningHome(false);
+                System.out.println("BATTERY CHARGED, BACK TO THE MISSION! ");
+                missionReturn(out, uav.getID(), lastposition);
+                
+                                
+            }
+            
+            
+            if (scenarioTime > 10 && !UAVS.get((int)uav.getID()-1).patrol && currentUAV.isReturningHome() == false) {
                 turnAwayFromFire(out, uav);
             }
 
@@ -727,7 +747,7 @@ public class zero extends Thread {
     private void callForFireMapping(OutputStream out, UAV curUAV, Location3D detectedLocation) throws Exception {
 
         boolean goInside = false;
-        if (curUAV.getLastFire() != null) {
+        if (curUAV.getLastFire() != null  ) {
             double latDiff = Math.abs(curUAV.getLastFire().getLatitude() - detectedLocation.getLatitude());
             double lonDiff = Math.abs(curUAV.getLastFire().getLongitude() - detectedLocation.getLongitude());
             if (latDiff > 0.01 || lonDiff > 0.01) {
@@ -738,7 +758,7 @@ public class zero extends Thread {
         }
         if (goInside) {
             for (UAV uav : UAVS) {
-                if (uav.isAvailable() && !uav.isMission()) {
+                if (uav.isAvailable() && !uav.isMission() && uav.isReturningHome() == false) {
                     goToFire(out, uav.getId(), detectedLocation);
                     uav.setAvailable(false);
                     break;
@@ -943,7 +963,7 @@ public class zero extends Thread {
 
         waypointDev.setLatitude(refuelLoc.getLatitude());
         waypointDev.setLongitude(refuelLoc.getLongitude());
-        waypointDev.setAltitude(700);
+        waypointDev.setAltitude(500);
 
         waypointDev.setAltitudeType(AltitudeType.MSL);
         //Setting unique ID for the waypoint
@@ -978,7 +998,19 @@ public class zero extends Thread {
 
         double batteryPercentage = uav.getEnergyAvailable();
 
-        if (batteryPercentage < 30) {
+        if (batteryPercentage < 60) {
+            //System.out.print(batteryPercentage);
+            return true;
+        }
+        return false;
+    }
+    
+        //check if the battery of the uav is high
+    public boolean isBatteryHigh(AirVehicleState uav) {
+
+        double batteryPercentage = uav.getEnergyAvailable();
+
+        if (batteryPercentage > 95) {
             //System.out.print(batteryPercentage);
             return true;
         }
@@ -1080,5 +1112,59 @@ public class zero extends Thread {
 
     public static void main(String[] args) {
         new zero().start();
+    }
+
+    private void missionReturn(OutputStream out, long id, Location3D lastposition) throws Exception
+    {
+        //We will now have 4 missions
+        ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
+
+        //one for each drone
+        MissionCommand o = new MissionCommand();
+
+        o.setFirstWaypoint(1);
+        //Setting the UAV to recieve the mission
+        o.setVehicleID(id);
+        o.setStatus(CommandStatusType.Pending);
+        //Setting a unique mission command ID
+        o.setCommandID(missionCount);
+        missionCount++;
+
+        //Creating the list of waypoints to be sent with the mission command
+        ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
+
+        Waypoint waypointDev = new Waypoint();
+
+        waypointDev.setLatitude(lastposition.getLatitude());
+        System.out.println("BOSS I AM NOW RETURNING TO " + lastposition.getLongitude() + " AND " + lastposition.getLatitude() + "  AND " + lastposition.getAltitude());
+        waypointDev.setLongitude(lastposition.getLongitude());
+        waypointDev.setAltitude(700);
+
+        waypointDev.setAltitudeType(AltitudeType.MSL);
+        //Setting unique ID for the waypoint
+        waypointDev.setNumber(1);
+
+        //Setting speed to reach the waypoint
+        waypointDev.setSpeed(100);
+        waypointDev.setSpeedType(SpeedType.Airspeed);
+
+        //Setting the climb rate to reach new altitude (if applicable)
+        waypointDev.setClimbRate(100);
+        waypointDev.setTurnType(TurnType.TurnShort);
+        //Setting backup waypoints if new waypoint can't be reached
+        waypointDev.setContingencyWaypointA(0);
+        waypointDev.setContingencyWaypointB(0);
+
+        // waypointDev.setNextWaypoint(i + 1);
+        waypoints.add(waypointDev);
+
+        //Setting the waypoint list in the mission command
+        o.getWaypointList().addAll(waypoints);
+
+        //Sending the Mission Command message to AMASE to be interpreted
+        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
+        wayPointNumber++;
+        wayPointListCount += 2;
+        
     }
 }
