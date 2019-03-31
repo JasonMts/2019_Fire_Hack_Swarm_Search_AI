@@ -33,6 +33,8 @@ public class UAV {
     
     private boolean gimbalChanged = false;
     
+    private boolean isgoingHome = false;
+    
     private boolean navCommand = false;
     
     private AirVehicleState lastAirstate;
@@ -259,5 +261,17 @@ public class UAV {
     public void setLonEnd(long lonEnd) {
         this.lonEnd = lonEnd;
     }
+    
+    public boolean isReturningHome()
+    {
+        return isgoingHome;
+    }
+    
+    public void setReturningHome(boolean state)
+    {
+        isgoingHome = state;
+    }
+    
+    
     
 }

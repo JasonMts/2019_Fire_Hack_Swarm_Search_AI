@@ -222,11 +222,11 @@ public class zero extends Thread {
                 if ((scenarioTime - last_time > 100000) && (scenarioTime > 10000)) {
                     last_time = scenarioTime;
                     for (UAV uav : UAVS) {
-                        if (!uav.isFixedWing() && uav.isAvailable() && !uav.isMission() && uav.patrol == false) {
+                        if (!uav.isFixedWing() && uav.isAvailable() && !uav.isMission() && uav.patrol == false && uav.isReturningHome() == false){
                             followFixedUavCmd(socket.getOutputStream(), uav.getId());
                             //uav.setMission(true);
                         }
-                        if (uav.patrol == true) {
+                        if (uav.patrol == true && uav.isReturningHome() == false){
                             sendMissionCommandWaypoints(socket.getOutputStream(), uav.getId(), uav.waypointList);
 
                         }
@@ -662,7 +662,7 @@ public class zero extends Thread {
 
             if (curUAV.isFixedWing()) {
                 callForFireMapping(out, curUAV, detectedLocation);
-            } else if (curUAV.isMulti() && !curUAV.patrol) {
+            } else if (curUAV.isMulti()  && !curUAV.patrol && curUAV.isReturningHome() == false) {
                 circleFire(out, curUAV, detectedLocation);
             }
 
@@ -675,15 +675,48 @@ public class zero extends Thread {
             windDirection_ = uav.getWindDirection();
 
             boolean batterylow = isBatteryLow(uav);
+            UAV currentUAV = UAVS.get((int)(uav.getID() - 1));
+            
+            //if it goes home recharge it will return to this afterwards
 
+//             Location3D lastposition = new Location3D();
+//             lastposition.setLatitude(53);
+//             lastposition.setLongitude(3);
+//             lastposition.setAltitude(700);
+             
+                     
             //System.out.println("Batter: " + batterylow + " return: " + returningHome);
             //System.out.println("Batter: " + batterylow + " return: " + returningHome);
-            if (batterylow && (returningHome == false)) {
-                returningHome = true;
+            if (batterylow && currentUAV.isReturningHome() == false) {
+                currentUAV.setReturningHome(true);
                 System.out.println("BATTERY LOWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW! GOING HOME FAM");
                 missionRecharge(out, uav.getID(), refuelLoc);
             }
-            if (scenarioTime > 10 && !UAVS.get((int) uav.getID() - 1).patrol) {
+            if (currentUAV.isReturningHome() && isBatteryHigh(uav) && scenarioTime > 10 && !UAVS.get((int) uav.getID() - 1).patrol)
+            {
+                //lastposition = UAVS.get((int)(uav.getID() - 1)).getLastAirstate().getLocation();
+                currentUAV.setReturningHome(false);
+                System.out.println("BATTERY CHARGED, BACK TO THE MISSION! ");
+                //missionReturn(out, uav.getID(), lastposition);
+                
+                //This if copied by above state to follow last mission
+                if (!currentUAV.isFixedWing() && currentUAV.isAvailable() && !currentUAV.isMission() && currentUAV.patrol == false && currentUAV.isReturningHome() == false){
+                    followFixedUavCmd(out, currentUAV.getId());
+                    System.out.println("I am UAV:" + currentUAV.getId() + "I am following fixed points");
+                              //uav.setMission(true);
+                    }
+                else if (currentUAV.patrol == true && currentUAV.isReturningHome() == false){
+                    System.out.println("I am UAV:" + currentUAV.getId() + "I am CommandWaypoints");
+                    sendMissionCommandWaypoints(out, currentUAV.getId(), currentUAV.waypointList);
+                    }
+                else{
+                    System.out.println("EEE PSile anergos eimai");}
+                    
+             
+            }
+            
+            
+            if (scenarioTime > 10 && !UAVS.get((int)uav.getID()-1).patrol && currentUAV.isReturningHome() == false) {
                 turnAwayFromFire(out, uav);
             }
 
@@ -721,11 +754,11 @@ public class zero extends Thread {
         AirVehicleConfiguration uavState = (AirVehicleConfiguration) o;
         //System.out.println(uavState.getEntityType());
         if (uavState.getEntityType().equals("FixedWing")) {
-            System.out.println("Hi am FixedWing with id: " + uavState.getID());
+            //System.out.println("Hi am FixedWing with id: " + uavState.getID());
             UAVS.add(new UAV(0, true, (int) uavState.getID()));
         } else {
             UAVS.add(new UAV(1, true, (int) uavState.getID()));
-            System.out.println("Hi am Multi with id: " + uavState.getID());
+            //System.out.println("Hi am Multi with id: " + uavState.getID());
         }
         sortList(UAVS);
 //        for(UAV uav : UAVS){
@@ -747,7 +780,7 @@ public class zero extends Thread {
     private void callForFireMapping(OutputStream out, UAV curUAV, Location3D detectedLocation) throws Exception {
 
         boolean goInside = false;
-        if (curUAV.getLastFire() != null) {
+        if (curUAV.getLastFire() != null  ) {
             double latDiff = Math.abs(curUAV.getLastFire().getLatitude() - detectedLocation.getLatitude());
             double lonDiff = Math.abs(curUAV.getLastFire().getLongitude() - detectedLocation.getLongitude());
             if (latDiff > 0.01 || lonDiff > 0.01) {
@@ -758,7 +791,7 @@ public class zero extends Thread {
         }
         if (goInside) {
             for (UAV uav : UAVS) {
-                if (uav.isAvailable() && !uav.isMission()) {
+                if (uav.isAvailable() && !uav.isMission() && uav.isReturningHome() == false) {
                     goToFire(out, uav.getId(), detectedLocation);
                     uav.setAvailable(false);
                     break;
@@ -775,26 +808,26 @@ public class zero extends Thread {
     private void circleFire(OutputStream out, UAV curUAV, Location3D detectedLocation) throws Exception {
 
         curUAV.setAvailable(false);
-        System.out.println("Uav " + curUAV.getId() + " found fire!!!");
-        System.out.println("PointCount " + curUAV.getCountMissedPoints());
+        //System.out.println("Uav " + curUAV.getId() + " found fire!!!");
+        //System.out.println("PointCount " + curUAV.getCountMissedPoints());
         if (curUAV.isGimbalChanged() == false) {
 
             //Add point to polygon and send the report
             curUAV.getEstimateHazardZone().getBoundaryPoints().add(detectedLocation);
             sendEstimateReport(out, curUAV.getEstimateHazardZone(), curUAV.getId());
 
-            System.out.println("Rotating Camera");
+            //System.out.println("Rotating Camera");
             sendSensorCommand(out, curUAV.getId());
             curUAV.setGimbalChanged(true);
             curUAV.incrementCountMissedPoints();
         }
         if (curUAV.isNavCommand()) {
             //we found fire change direction CCW
-            System.out.println("2Current dir: " + curUAV.getLastAirstate().getHeading() + " askedHeading: " + curUAV.getHeadingDir());
+            //System.out.println("2Current dir: " + curUAV.getLastAirstate().getHeading() + " askedHeading: " + curUAV.getHeadingDir());
 
             curUAV.setHeadingDir(curUAV.getLastAirstate().getHeading());
 
-            System.out.println("UAV: " + curUAV.getId() + " turning -12");
+            //System.out.println("UAV: " + curUAV.getId() + " turning -12");
             curUAV.setHeadingDir(curUAV.getLastAirstate().getHeading() - 12);
             //increment counter if points == 10 add current point to polygon
             curUAV.incrementCountMissedPoints();
@@ -818,16 +851,16 @@ public class zero extends Thread {
                 }
 
                 if (curUAV.getCircleCounter() >= curUAV.getCurrSizePolygon() && curUAV.getCircleCounter() != 0) {
-                    System.out.println("New points");
+                    //System.out.println("New points");
                     curUAV.setCircleFire(false);
 
                 }
                 if (curUAV.isCircleFire()) {
-                    System.out.println("Counter3: " + curUAV.getCircleCounter() + " size: " + curUAV.getCurrSizePolygon());
+                    //System.out.println("Counter3: " + curUAV.getCircleCounter() + " size: " + curUAV.getCurrSizePolygon());
                     curUAV.getEstimateHazardZone().getBoundaryPoints().set(curUAV.getCircleCounter(), detectedLocation);
                     curUAV.incrementCircleCounter();
                 } else {
-                    System.out.println("Add point UAV1");
+                    //System.out.println("Add point UAV1");
                     curUAV.getEstimateHazardZone().getBoundaryPoints().add(detectedLocation);
                     curUAV.incrementPolygonSize();
                 }
@@ -853,20 +886,20 @@ public class zero extends Thread {
         UAV curUAV = UAVS.get(((int) uav.getID() - 1));
         curUAV.setLastAirstate(uav);
         if (curUAV.isGimbalChanged() && curUAV.isNavCommand() == false) {
-            System.out.println("Change direction for UAV : " + uav.getID());
+            //System.out.println("Change direction for UAV : " + uav.getID());
             curUAV.setHeadingDir(uav.getHeading() - 90);
             FlightDirectorAction dir = new FlightDirectorAction(uav.getAirspeed(), SpeedType.Groundspeed, curUAV.getHeadingDir(), uav.getLocation().getAltitude(), AltitudeType.MSL, 0);
             sendNavigationCommand(out, (int) uav.getID(), dir);
             curUAV.setNavCommand(true);
         }
         if (curUAV.isNavCommand()) {
-            System.out.println("Current dir: " + curUAV.getLastAirstate().getHeading() + " askedHeading: " + curUAV.getHeadingDir());
-            System.out.println("Current time: " + scenarioTime + " elapsed: " + curUAV.getElapsedTime());
+            //System.out.println("Current dir: " + curUAV.getLastAirstate().getHeading() + " askedHeading: " + curUAV.getHeadingDir());
+            //System.out.println("Current time: " + scenarioTime + " elapsed: " + curUAV.getElapsedTime());
             if (Math.abs(Math.abs(curUAV.getHeadingDir()) - Math.abs(curUAV.getLastAirstate().getHeading())) < 10) {
                 if (scenarioTime - curUAV.getElapsedTime() > 1000) {
                     curUAV.setHeadingDir(curUAV.getLastAirstate().getHeading());
 
-                    System.out.println("UAV: " + uav.getID() + " turning +7");
+                    //System.out.println("UAV: " + uav.getID() + " turning +7");
                     curUAV.setHeadingDir(curUAV.getHeadingDir() + 7);
 
                     FlightDirectorAction dir = new FlightDirectorAction(15, SpeedType.Groundspeed, curUAV.getHeadingDir(), curUAV.getLastAirstate().getLocation().getAltitude(), AltitudeType.MSL, 0);
@@ -877,7 +910,7 @@ public class zero extends Thread {
                     }
                     curUAV.setElapsedTime(scenarioTime);
                 } else {
-                    System.out.println("Delay UAV: " + uav.getID());
+                    //System.out.println("Delay UAV: " + uav.getID());
                 }
             }
         }
@@ -908,7 +941,7 @@ public class zero extends Thread {
             }
             return connect(host, port);
         }
-        System.out.println("Connected to " + host + ":" + port);
+        //System.out.println("Connected to " + host + ":" + port);
         return socket;
     }
 
@@ -963,7 +996,7 @@ public class zero extends Thread {
 
         waypointDev.setLatitude(refuelLoc.getLatitude());
         waypointDev.setLongitude(refuelLoc.getLongitude());
-        waypointDev.setAltitude(700);
+        waypointDev.setAltitude(500);
 
         waypointDev.setAltitudeType(AltitudeType.MSL);
         //Setting unique ID for the waypoint
@@ -998,7 +1031,19 @@ public class zero extends Thread {
 
         double batteryPercentage = uav.getEnergyAvailable();
 
-        if (batteryPercentage < 30) {
+        if (batteryPercentage < 60) {
+            //System.out.print(batteryPercentage);
+            return true;
+        }
+        return false;
+    }
+    
+        //check if the battery of the uav is high
+    public boolean isBatteryHigh(AirVehicleState uav) {
+
+        double batteryPercentage = uav.getEnergyAvailable();
+
+        if (batteryPercentage > 95) {
             //System.out.print(batteryPercentage);
             return true;
         }
@@ -1041,7 +1086,7 @@ public class zero extends Thread {
         } else if ((windDirection_ > 270) && (windDirection_ < 360)) {
             relativeWindDirection = 630 - windDirection_;
         }
-        System.out.printf("WindSpeed:: %f\n", relativeWindDirection);
+        //System.out.printf("WindSpeed:: %f\n", relativeWindDirection);
 
         // Check the fire polygon
         float relativeSearchDirection = relativeWindDirection + 180;
@@ -1052,7 +1097,7 @@ public class zero extends Thread {
         float cntr[] = new float[2];
         getCentroid(hazardZone, cntr);
 
-        System.out.printf("range [%f,%f] :\n", maxRange, minRange);
+        //System.out.printf("range [%f,%f] :\n", maxRange, minRange);
 
         double xx, yy;
 
@@ -1070,7 +1115,7 @@ public class zero extends Thread {
             //System.out.printf("loc [%f,^%f], angle: [%f] :\n",xx,yy,angl) ; 
 
             if (((angl) < maxRange) && (angl > minRange)) {
-                System.out.printf("My awesome angle:: %f @ point x,y:: [%f,%f]\n", angl, hazardZone.getBoundaryPoints().get(i).getLatitude(), hazardZone.getBoundaryPoints().get(i).getLongitude());
+                //System.out.printf("My awesome angle:: %f @ point x,y:: [%f,%f]\n", angl, hazardZone.getBoundaryPoints().get(i).getLatitude(), hazardZone.getBoundaryPoints().get(i).getLongitude());
                 addWaypointToList(hazardZone.getBoundaryPoints().get(i).getLatitude(), hazardZone.getBoundaryPoints().get(i).getLongitude(), waypointList);
             }
         }
@@ -1100,5 +1145,59 @@ public class zero extends Thread {
 
     public static void main(String[] args) {
         new zero().start();
+    }
+
+    private void missionReturn(OutputStream out, long id, Location3D lastposition) throws Exception
+    {
+        //We will now have 4 missions
+        ArrayList<MissionCommand> missions = new ArrayList<MissionCommand>();
+
+        //one for each drone
+        MissionCommand o = new MissionCommand();
+
+        o.setFirstWaypoint(1);
+        //Setting the UAV to recieve the mission
+        o.setVehicleID(id);
+        o.setStatus(CommandStatusType.Pending);
+        //Setting a unique mission command ID
+        o.setCommandID(missionCount);
+        missionCount++;
+
+        //Creating the list of waypoints to be sent with the mission command
+        ArrayList<Waypoint> waypoints = new ArrayList<Waypoint>();
+
+        Waypoint waypointDev = new Waypoint();
+
+        waypointDev.setLatitude(lastposition.getLatitude());
+        System.out.println("BOSS I AM NOW RETURNING TO " + lastposition.getLongitude() + " AND " + lastposition.getLatitude() + "  AND " + lastposition.getAltitude());
+        waypointDev.setLongitude(lastposition.getLongitude());
+        waypointDev.setAltitude(700);
+
+        waypointDev.setAltitudeType(AltitudeType.MSL);
+        //Setting unique ID for the waypoint
+        waypointDev.setNumber(1);
+
+        //Setting speed to reach the waypoint
+        waypointDev.setSpeed(100);
+        waypointDev.setSpeedType(SpeedType.Airspeed);
+
+        //Setting the climb rate to reach new altitude (if applicable)
+        waypointDev.setClimbRate(100);
+        waypointDev.setTurnType(TurnType.TurnShort);
+        //Setting backup waypoints if new waypoint can't be reached
+        waypointDev.setContingencyWaypointA(0);
+        waypointDev.setContingencyWaypointB(0);
+
+        // waypointDev.setNextWaypoint(i + 1);
+        waypoints.add(waypointDev);
+
+        //Setting the waypoint list in the mission command
+        o.getWaypointList().addAll(waypoints);
+
+        //Sending the Mission Command message to AMASE to be interpreted
+        out.write(avtas.lmcp.LMCPFactory.packMessage(o, true));
+        wayPointNumber++;
+        wayPointListCount += 2;
+        
     }
 }
