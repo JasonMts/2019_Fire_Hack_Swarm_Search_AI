@@ -47,6 +47,11 @@ public class UAV {
     private int currSizePolygon = 0;
     private long elapsedTime = 0;
     private boolean gotFollower = false;
+    Location3D pointBeforeCharge;
+    private boolean goingBack = false;
+    
+    private int droneID;
+    
     public UAV(int droneType, boolean available, int id) {
         this.droneType = droneType;
         this.available = available;
@@ -54,7 +59,7 @@ public class UAV {
     }
     
     public boolean patrol = false; 
-    private int  follower;
+    private int  follower=-1;
     public long latEnd;
     public long lonEnd;
 
@@ -270,6 +275,54 @@ public class UAV {
     public void setReturningHome(boolean state)
     {
         isgoingHome = state;
+    }
+
+    public boolean isIsgoingHome() {
+        return isgoingHome;
+    }
+
+    public void setIsgoingHome(boolean isgoingHome) {
+        this.isgoingHome = isgoingHome;
+    }
+
+    public Location3D getPointBeforeCharge() {
+        return pointBeforeCharge;
+    }
+
+    public void setPointBeforeCharge(Location3D pointBeforeCharge) {
+        this.pointBeforeCharge = pointBeforeCharge;
+    }
+
+    public boolean isPatrol() {
+        return patrol;
+    }
+
+    public void setPatrol(boolean patrol) {
+        this.patrol = patrol;
+    }
+
+    public ArrayList<Waypoint> getWaypointList() {
+        return waypointList;
+    }
+
+    public void setWaypointList(ArrayList<Waypoint> waypointList) {
+        this.waypointList = waypointList;
+    }
+
+    public boolean isGoingBack() {
+        return goingBack;
+    }
+
+    public void setGoingBack(boolean goingBack) {
+        this.goingBack = goingBack;
+    }
+
+    public int getDroneID() {
+        return droneID;
+    }
+
+    public void setDroneID(int droneID) {
+        this.droneID = droneID;
     }
     
     
